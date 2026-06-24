@@ -41,6 +41,7 @@ INSTALLED_APPS = [
 INSTALLED_APPS += [
     'core',
     'app.account',
+    'app.super_admin',
 ]
 
 # Third-party apps

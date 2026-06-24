@@ -98,6 +98,14 @@ class UserAccount(
         default=Role.ADMIN,
     )
 
+    company = models.ForeignKey(
+        'Company',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users'
+    )
+
     profile_updated_at = models.DateTimeField(
         blank=True,
         null=True
@@ -303,3 +311,4 @@ class Company(BaseModel):
 
     def __str__(self):
         return self.company_name or f"Company {self.id}"
+
