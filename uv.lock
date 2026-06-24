@@ -100,6 +100,12 @@ wheels = [
 ]
 
 [[package]]
+name = "environ"
+version = "1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/29/e4/6f448fcce1649a1f0f265e20bd88b7c8ff36e265657604b920240045928b/environ-1.0.tar.gz", hash = "sha256:4df7f1dfeb7d1c988d2e19a8bd5d547a526e0400aeb35adf732032472f35dcb0", size = 2628, upload-time = "2007-08-06T01:55:14Z" }
+
+[[package]]
 name = "inflection"
 version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
@@ -118,6 +124,7 @@ dependencies = [
     { name = "djangorestframework" },
     { name = "djangorestframework-simplejwt" },
     { name = "drf-spectacular" },
+    { name = "environ" },
     { name = "pillow" },
     { name = "whitenoise" },
 ]
@@ -129,6 +136,7 @@ requires-dist = [
     { name = "djangorestframework", specifier = ">=3.17.1" },
     { name = "djangorestframework-simplejwt", specifier = ">=5.5.1" },
     { name = "drf-spectacular", specifier = ">=0.29.0" },
+    { name = "environ", specifier = ">=1.0" },
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "whitenoise", specifier = ">=6.12.0" },
 ]
