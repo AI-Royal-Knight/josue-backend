@@ -21,7 +21,9 @@ environ.Env.read_env(BASE_DIR / '.env')
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env('SECRET_KEY')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "*"
+]
 
 
 # Application definition
@@ -60,13 +62,11 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "https://payparo.tripmate.cloud",
-    "https://api.payparo.com",
+    "https://josue.tripmate.cloud",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://payparo.tripmate.cloud",
-    "https://api.payparo.com",
+    "https://josue.tripmate.cloud",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
