@@ -72,6 +72,7 @@ class UserAccount(
     class Role(models.TextChoices):
         SUPER_ADMIN = "super_admin", "Super Admin"
         ADMIN = "admin", "Admin"
+        PROJECT_ADMIN = "project_admin", "Project Admin"
 
     email = models.EmailField(
         _("email address"),
