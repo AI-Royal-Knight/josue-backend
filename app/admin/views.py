@@ -1,4 +1,6 @@
 from rest_framework.views import APIView
+from django.core.mail import send_mail
+from django.conf import settings
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -93,7 +95,24 @@ class ProjectAdminsView(APIView):
             )
 
             invitation_link = f"https://yourfrontend.com/invitation/{invitation.token}"
-            # TODO: Send email here
+            
+            subject = 'Invitation to join as Project Admin'
+            message = (
+                f'Hello {project_admin_user.first_name},\n\n'
+                f'You have been invited as a Project Admin for {request.user.company.company_name}.\n'
+                f'Please use the following link to accept your invitation and set up your account:\n'
+                f'{invitation_link}\n\n'
+                f'This link will expire in 7 days.\n\n'
+                f'Thank you.'
+            )
+            
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [project_admin_user.email],
+                fail_silently=False,
+            )
 
         return Response(
             {

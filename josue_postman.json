@@ -1,0 +1,425 @@
+{
+    "info": {
+        "_postman_id": "b12c2abd-d2ab-41db-b7da-cdad5b1184af",
+        "name": "Josue",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_exporter_id": "24845302",
+        "_collection_link": "https://nexduo.postman.co/workspace/JVAI~113a50a6-2c67-402a-916a-e10530df6b56/collection/24845302-b12c2abd-d2ab-41db-b7da-cdad5b1184af?action=share&source=collection_link&creator=24845302"
+    },
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"jamil@gmail.com\",\n    \"password\": \"admin\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/account/login/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "account",
+                                "login",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Profile",
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    },
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"ashiqulislamayon28@gmail.com\",\n    \"password\": \"1fjw0676\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/account/profile/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "account",
+                                "profile",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Super Admin",
+            "item": [
+                {
+                    "name": "Overview",
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    },
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"ashiqulislamayon28@gmail.com\",\n    \"password\": \"1fjw0676\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/super-admin/overview/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "super-admin",
+                                "overview",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Invite Admin",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/super-admin/invite-admin/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "super-admin",
+                                "invite-admin",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Companies",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/super-admin/companies/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "super-admin",
+                                "companies",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Admin",
+            "item": [
+                {
+                    "name": "Home",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/admin/home/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "admin",
+                                "home",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Profile",
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    },
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"ashiqulislamayon28@gmail.com\",\n    \"password\": \"1fjw0676\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/admin/profile/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "admin",
+                                "profile",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Invite PM",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"first_name\": \"ashiqul\",\n    \"last_name\": \"islam\",\n    \"email\": \"ayon@gmail.com\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/admin/project-admins/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "admin",
+                                "project-admins",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "PM List",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/admin/project-admins/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "admin",
+                                "project-admins",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Project Admin",
+            "item": [
+                {
+                    "name": "Create Project",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"project_name\": \"New Project\",\n    \"job_code\": \"JOB123\",\n    \"vat_rate\": 20.00,\n    \"address\": \"123 Main St\",\n    \"project_value\": 100000.00,\n    \"material_estimate\": 30000.00,\n    \"labour_estimate\": 40000.00,\n    \"prelims_estimate\": 10000.00,\n    \"start_date\": \"2023-01-01\",\n    \"completion_date\": \"2023-12-31\",\n    \"is_completed\": false\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/project-admin/projects/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "project-admin",
+                                "projects",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Project List",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/project-admin/projects/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "project-admin",
+                                "projects",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Project Detail",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/project-admin/projects/{{project_id}}/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "project-admin",
+                                "projects",
+                                "{{project_id}}",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Project",
+                    "request": {
+                        "method": "PUT",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"project_name\": \"Updated Project\",\n    \"job_code\": \"JOB123\",\n    \"vat_rate\": 20.00,\n    \"address\": \"123 Main St\",\n    \"project_value\": 100000.00,\n    \"material_estimate\": 30000.00,\n    \"labour_estimate\": 40000.00,\n    \"prelims_estimate\": 10000.00,\n    \"start_date\": \"2023-01-01\",\n    \"completion_date\": \"2023-12-31\",\n    \"is_completed\": false\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/project-admin/projects/{{project_id}}/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "project-admin",
+                                "projects",
+                                "{{project_id}}",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Project",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseURL}}/api/v1/project-admin/projects/{{project_id}}/",
+                            "host": [
+                                "{{baseURL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "project-admin",
+                                "projects",
+                                "{{project_id}}",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgyMzEwNDE4LCJpYXQiOjE3ODIyOTYwMTgsImp0aSI6Ijg3MTk5YWQyNWRhMDQ2MWJiMDlhNzc5ZThlZGVhODkzIiwidXNlcl9pZCI6IjRmMGU1NTg5LTVkZjktNDg1YS05OTAwLTE3Nzc3YzdkZWM0NiJ9.7224cpaB3Zqmr96lZLdlijBvb5SAsfsJzn-vp-k22Yc",
+                "type": "string"
+            }
+        ]
+    },
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseURL",
+            "value": ""
+        }
+    ]
+}

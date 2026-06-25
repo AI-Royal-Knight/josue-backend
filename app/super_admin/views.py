@@ -1,4 +1,6 @@
 from django.db import transaction
+from django.core.mail import send_mail
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -114,13 +116,23 @@ class CompaniesView(APIView):
                 f"{invitation.token}"
             )
 
-            # TODO:
-            # Send email here
-            #
-            # send_invitation_email(
-            #     user=admin_user,
-            #     invitation_link=invitation_link
-            # )
+            subject = 'Invitation to join as Admin'
+            message = (
+                f'Hello {admin_user.first_name},\n\n'
+                f'You have been invited as an Admin for {company.company_name}.\n'
+                f'Please use the following link to accept your invitation and set up your account:\n'
+                f'{invitation_link}\n\n'
+                f'This link will expire in 7 days.\n\n'
+                f'Thank you.'
+            )
+            
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [admin_user.email],
+                fail_silently=False,
+            )
 
         return Response(
             {
