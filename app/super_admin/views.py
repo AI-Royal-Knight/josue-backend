@@ -15,6 +15,7 @@ from app.super_admin.serializers import (
 from app.account.permissions import IsSuperAdmin
 from app.account.models import UserAccount, Company
 from app.super_admin.models import CompanyInvitation
+from app.project_admin.models import Project
 
 from django.db import transaction
 from django.db.models import Prefetch
@@ -49,10 +50,9 @@ class CompaniesView(APIView):
         admin_users_count = UserAccount.objects.filter(role=UserAccount.Role.ADMIN).count()
         users_count = UserAccount.objects.exclude(role=UserAccount.Role.SUPER_ADMIN).count()
         
-        # Dummy data as requested
-        projects_count = 789
-        active_count = 12
-        suspended_count = 3
+        projects_count = Project.objects.count()
+        active_count = Company.objects.filter(status=Company.Status.ACTIVE).count()
+        suspended_count = Company.objects.filter(status=Company.Status.SUSPENDED).count()
         
         return Response({
             "summary": {
@@ -129,7 +129,7 @@ class CompaniesView(APIView):
             send_mail(
                 subject,
                 message,
-                settings.DEFAULT_FROM_EMAIL,
+                settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
                 [admin_user.email],
                 fail_silently=False,
             )
@@ -145,3 +145,45 @@ class CompaniesView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class CompanyDetailView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def patch(self, request, pk):
+        try:
+            company = Company.objects.get(pk=pk)
+        except Company.DoesNotExist:
+            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+
+        if "activate" in data:
+            company.activate = data["activate"]
+            if company.activate:
+                company.status = Company.Status.ACTIVE
+            else:
+                company.status = Company.Status.SUSPENDED
+
+        if "monthly_subscription" in data:
+            company.monthly_subscription = data["monthly_subscription"]
+            
+        if "per_user_rate" in data:
+            company.per_user_rate = data["per_user_rate"]
+            
+        if "auto_monthly_inv" in data:
+            company.auto_monthly_inv = data["auto_monthly_inv"]
+            
+        company.save()
+
+        # Prefetch the users again if returning the full serialized object
+        company = Company.objects.prefetch_related(
+            Prefetch(
+                'users', 
+                queryset=UserAccount.objects.filter(role=UserAccount.Role.ADMIN), 
+                to_attr='admin_users'
+            )
+        ).get(pk=pk)
+
+        serializer = CompanyListSerializer(company)
+        return Response(serializer.data, status=status.HTTP_200_OK)

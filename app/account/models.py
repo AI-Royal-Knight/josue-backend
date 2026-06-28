@@ -3,7 +3,7 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-
+import uuid
 from decimal import Decimal
 from core.models import BaseModel
 
@@ -73,6 +73,15 @@ class UserAccount(
         SUPER_ADMIN = "super_admin", "Super Admin"
         ADMIN = "admin", "Admin"
         PROJECT_ADMIN = "project_admin", "Project Admin"
+        MANAGING_DIRECTOR = "managing_director", "Managing Director"
+        DOCUMENT_CONTROLLER = "document_controller", "Document Controller"
+        COMMERCIAL_MANAGER = "commercial_manager", "Commercial Manager"
+        PROCUREMENT = "procurement", "Procurement Department"
+        CONTRACTS_MANAGER = "contracts_manager", "Contracts Manager"
+        MANAGER = "manager", "Manager"
+        SUPERVISOR = "supervisor", "Supervisor"
+        EMPLOYEE = "employee", "Employee"
+        SUPPLIER = "supplier", "Supplier"
 
     email = models.EmailField(
         _("email address"),
@@ -313,3 +322,98 @@ class Company(BaseModel):
     def __str__(self):
         return self.company_name or f"Company {self.id}"
 
+
+class RoleAssignment(BaseModel):
+    user = models.ForeignKey(UserAccount, on_delete=models.CASCADE, related_name="role_assignments")
+    role = models.CharField(max_length=50, choices=UserAccount.Role.choices)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
+    project = models.ForeignKey('project_admin.Project', on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
+
+    class Meta:
+        db_table = "role_assignments"
+        unique_together = ('user', 'role', 'company', 'project')
+        
+    def __str__(self):
+        return f"{self.user.email} - {self.role}"
+
+
+class UserProfile(BaseModel):
+    user = models.OneToOneField(UserAccount, on_delete=models.CASCADE, related_name="profile")
+    
+    # Certifications
+    cscs_card_no = models.CharField(max_length=50, blank=True, null=True)
+    cscs_expiry_date = models.DateField(blank=True, null=True)
+    ipaf_certification = models.CharField(max_length=100, blank=True, null=True)
+    pasma_certification = models.CharField(max_length=100, blank=True, null=True)
+    sssts_smsts = models.CharField(max_length=100, blank=True, null=True)
+    profession = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Emergency Contact
+    emergency_contact_name = models.CharField(max_length=255, blank=True, null=True)
+    emergency_contact_number = models.CharField(max_length=50, blank=True, null=True)
+    
+    is_approved = models.BooleanField(default=False)
+    approved_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_profiles")
+
+    class Meta:
+        db_table = "user_profiles"
+
+    def __str__(self):
+        return f"Profile for {self.user.email}"
+
+
+class SupplierProfile(BaseModel):
+    user = models.OneToOneField(UserAccount, on_delete=models.CASCADE, related_name="supplier_profile")
+    company_name = models.CharField(max_length=255)
+    
+    class Meta:
+        db_table = "supplier_profiles"
+
+    def __str__(self):
+        return self.company_name
+
+
+class CompanySupplier(BaseModel):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="suppliers")
+    supplier = models.ForeignKey(SupplierProfile, on_delete=models.CASCADE, related_name="companies")
+    
+    eom_payment_terms = models.PositiveIntegerField(help_text="End of Month payment terms in days", default=30)
+    credit_limit = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+
+    class Meta:
+        db_table = "company_suppliers"
+        unique_together = ('company', 'supplier')
+
+    def __str__(self):
+        return f"{self.supplier.company_name} -> {self.company.company_name}"
+
+
+class Invitation(BaseModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        REJECTED = "rejected", "Rejected"
+        EXPIRED = "expired", "Expired"
+
+    email = models.EmailField()
+    role = models.CharField(max_length=50, choices=UserAccount.Role.choices)
+    
+    # Context
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, null=True, blank=True)
+    project = models.ForeignKey('project_admin.Project', on_delete=models.CASCADE, null=True, blank=True)
+    
+    invited_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, related_name="sent_invitations")
+    
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    
+    expires_at = models.DateTimeField()
+    
+    class Meta:
+        db_table = "invitations"
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def __str__(self):
+        return f"Invite {self.email} as {self.role}"

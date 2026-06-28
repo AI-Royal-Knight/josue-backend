@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Project
+from app.account.models import RoleAssignment, UserAccount
 
 
 class ProjectListSerializer(serializers.ModelSerializer):
@@ -63,3 +64,46 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
             "completion_date",
             "is_completed",
         ]
+
+
+class UserAccountMinimalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserAccount
+        fields = ['id', 'first_name', 'last_name', 'email']
+
+class RoleAssignmentSerializer(serializers.ModelSerializer):
+    user = UserAccountMinimalSerializer(read_only=True)
+    
+    class Meta:
+        model = RoleAssignment
+        fields = ['id', 'user', 'role', 'project']
+
+
+from .models import ProjectFolder, ProjectSubfolder, FolderAssignment
+
+class FolderAssignmentSerializer(serializers.ModelSerializer):
+    user = UserAccountMinimalSerializer(read_only=True)
+    class Meta:
+        model = FolderAssignment
+        fields = ['id', 'user', 'hide_labour_target', 'is_management_assignment']
+
+class ProjectSubfolderSerializer(serializers.ModelSerializer):
+    assignments = FolderAssignmentSerializer(many=True, read_only=True)
+    class Meta:
+        model = ProjectSubfolder
+        fields = ['id', 'name', 'project_value', 'labour_target', 'rows', 'assignments']
+
+class ProjectFolderSerializer(serializers.ModelSerializer):
+    subfolders = ProjectSubfolderSerializer(many=True, read_only=True)
+    class Meta:
+        model = ProjectFolder
+        fields = ['id', 'name', 'is_management', 'subfolders']
+
+
+from .models import ApprovalConfiguration
+
+class ApprovalConfigurationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ApprovalConfiguration
+        fields = ['id', 'action_type', 'condition_value', 'required_roles', 'is_active']
+

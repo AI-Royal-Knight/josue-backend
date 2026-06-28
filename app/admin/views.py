@@ -109,7 +109,7 @@ class ProjectAdminsView(APIView):
             send_mail(
                 subject,
                 message,
-                settings.DEFAULT_FROM_EMAIL,
+                settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
                 [project_admin_user.email],
                 fail_silently=False,
             )
