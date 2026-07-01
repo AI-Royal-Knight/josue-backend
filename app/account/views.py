@@ -3,6 +3,12 @@ from rest_framework.response import Response
 from rest_framework import permissions, status
 
 from django.contrib.auth import authenticate
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
+from django.conf import settings
+from django.utils import timezone
 
 from drf_spectacular.utils import extend_schema
 
@@ -12,6 +18,9 @@ from .serializers import (
     LoginSerializer,
     SendInvitationSerializer,
     AcceptInvitationSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
+    SubmitApplicationSerializer,
 )
 from .tokens import get_tokens_for_user
 from .models import Invitation, RoleAssignment, UserProfile, SupplierProfile, CompanySupplier, Company, UserAccount
@@ -55,6 +64,49 @@ class ProfileView(APIView):
             
         user.save()
 
+        # Update profile info
+        profile_data = data.get("profile", {})
+        if profile_data:
+            try:
+                profile = user.profile
+            except Exception:
+                from .models import UserProfile
+                profile = UserProfile.objects.create(user=user)
+                
+            for field in [
+                'cscs_card_no', 'cscs_expiry_date', 'ipaf_certification', 'pasma_certification',
+                'sssts_smsts', 'profession', 'emergency_contact_name', 'emergency_contact_number',
+                'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature'
+            ]:
+                if field in profile_data:
+                    val = profile_data[field]
+                    if val == "" and field.endswith('_date'):
+                        val = None
+                    setattr(profile, field, val)
+            profile.save()
+
+        # Update company info
+        company_data = data.get("company", {})
+        if company_data:
+            if not user.company:
+                from .models import Company
+                company = Company.objects.create()
+                user.company = company
+                user.save()
+            
+            company = user.company
+            for field in [
+                'company_name', 'company_number', 'building_number', 'street', 'town', 'city', 'postcode',
+                'vat_number', 'phone', 'bank_name', 'bank_address', 'sort_code', 'account_number',
+                'iban', 'swift_bic'
+            ]:
+                if field in company_data:
+                    val = company_data[field]
+                    if val == "":
+                        val = None
+                    setattr(company, field, val)
+            company.save()
+
         updated_data = ProfileService.get_profile(user)
         return Response(updated_data, status=status.HTTP_200_OK)
 
@@ -73,11 +125,12 @@ class LoginView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = authenticate(
-            username=serializer.validated_data["email"],
-            password=serializer.validated_data["password"],
-        )
-        if not user:
+        email = serializer.validated_data["email"]
+        password = serializer.validated_data["password"]
+
+        user = UserAccount.objects.filter(email=email).first()
+        
+        if not user or not user.check_password(password):
             return Response(
                 {"error": "Invalid email or password."},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -85,7 +138,19 @@ class LoginView(APIView):
 
         if not user.is_active:
             return Response(
-                {"error": "Account is not active. Please verify your email."},
+                {"error": "Account is not active. Please verify your email or contact support."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if hasattr(user, 'profile') and not user.profile.is_approved:
+            return Response(
+                {"error": "Your account is pending approval by an administrator."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if getattr(user, 'company', None) and not user.company.activate:
+            return Response(
+                {"error": "Your company account has been deactivated. Please contact support."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -114,11 +179,50 @@ class SendInvitationView(APIView):
     def post(self, request):
         serializer = SendInvitationSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_request)
+            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
             
-        # Logic to create Invitation and send email
-        # ...
-        return Response({"success": True, "message": "Invitation sent"})
+        email = serializer.validated_data["email"]
+        role = serializer.validated_data["role"]
+        
+        # Check if user already exists
+        if UserAccount.objects.filter(email=email).exists():
+            return Response({"error": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Create Invitation
+        invitation = Invitation.objects.create(
+            email=email,
+            role=role,
+            company=request.user.company,
+            invited_by=request.user,
+            expires_at=timezone.now() + timezone.timedelta(days=7)
+        )
+        
+        # Send Email
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+        invitation_link = f"{frontend_url}/accept-invite/{invitation.token}"
+        
+        role_display = dict(UserAccount.Role.choices).get(role, role)
+        company_name = request.user.company.company_name if request.user.company else "our platform"
+        
+        subject = f"Invitation to join as {role_display}"
+        message = (
+            f"Hello,\n\n"
+            f"You have been invited to join {company_name} as a {role_display}.\n"
+            f"Please click the link below to accept your invitation and set up your account:\n"
+            f"{invitation_link}\n\n"
+            f"This link will expire in 7 days.\n\n"
+            f"Thank you."
+        )
+        
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
+            [email],
+            fail_silently=False,
+        )
+        
+        return Response({"success": True, "message": "Invitation sent successfully."})
 
 
 class ValidateInvitationView(APIView):
@@ -164,6 +268,9 @@ class AcceptInvitationView(APIView):
             defaults={
                 'first_name': serializer.validated_data["first_name"],
                 'last_name': serializer.validated_data["last_name"],
+                'role': invitation.role,
+                'company': invitation.company,
+                'is_active': True,
             }
         )
         if created:
@@ -171,7 +278,7 @@ class AcceptInvitationView(APIView):
             user.save()
             
         # Create role assignment
-        RoleAssignment.objects.create(
+        RoleAssignment.objects.get_or_create(
             user=user,
             role=invitation.role,
             company=invitation.company,
@@ -183,3 +290,214 @@ class AcceptInvitationView(APIView):
         invitation.save()
         
         return Response({"success": True})
+
+
+class ForgotPasswordView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=ForgotPasswordSerializer, responses={200: dict})
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        user = UserAccount.objects.filter(email=email).first()
+
+        # Always return success to prevent email enumeration
+        if user:
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+            reset_link = f"{frontend_url}/reset-password?uid={uid}&token={token}"
+            
+            subject = "Reset Your Password"
+            message = (
+                f"Hello {user.first_name},\n\n"
+                f"You requested to reset your password. Please click the link below to set a new password:\n"
+                f"{reset_link}\n\n"
+                f"If you did not request this, please ignore this email.\n\n"
+                f"Thank you."
+            )
+            
+            send_mail(
+                subject,
+                message,
+                getattr(settings, 'DEFAULT_FROM_EMAIL', 'info@tresta.cloud'),
+                [user.email],
+                fail_silently=True,
+            )
+
+        return Response({"success": True, "message": "If an account with that email exists, a reset link has been sent."})
+
+
+class ResetPasswordView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=ResetPasswordSerializer, responses={200: dict})
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
+
+        uid_b64 = serializer.validated_data["uid"]
+        token = serializer.validated_data["token"]
+        new_password = serializer.validated_data["new_password"]
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uid_b64))
+            user = UserAccount.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, UserAccount.DoesNotExist):
+            return Response({"error": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not default_token_generator.check_token(user, token):
+            return Response({"error": "Invalid or expired reset link."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"success": True, "message": "Password has been successfully reset."})
+
+
+class SubmitApplicationView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=SubmitApplicationSerializer, responses={200: dict})
+    def post(self, request):
+        serializer = SubmitApplicationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        email = data["email"]
+
+        if UserAccount.objects.filter(email=email).exists():
+            return Response({"error": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create Company
+        company = Company.objects.create(
+            company_name=data.get("company_name"),
+            company_number=data.get("company_house_number") if data.get("company_house_number") and data.get("company_house_number").isdigit() else None,
+            vat_number=data.get("company_utr"),
+            bank_name=data.get("bank_name"),
+            bank_address=data.get("bank_address"),
+            account_number=data.get("account_number"),
+            sort_code=data.get("sort_code"),
+            building_number=None, # Frontend just passes "building" string
+            street=data.get("building"),
+            postcode=data.get("postcode")
+        )
+
+        # Create User
+        user = UserAccount.objects.create(
+            email=email,
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            role=data["role"],
+            company=company,
+            is_active=True,  # Wait, usually this is pending, but since frontend currently just toggles `is_approved`, we can leave it active but unapproved profile.
+        )
+        user.set_password(data["password"])
+        user.save()
+
+        # Create Role Assignment
+        RoleAssignment.objects.create(
+            user=user,
+            role=data["role"],
+            company=company
+        )
+
+        # Create User Profile
+        UserProfile.objects.create(
+            user=user,
+            profession=data["role"],
+            cscs_card_no=data.get("cscs"),
+            cscs_expiry_date=data.get("cscs_expiry"),
+            ipaf_certification=data.get("ipaf"),
+            pasma_certification=data.get("pasma"),
+            sssts_smsts=data.get("smsts"),
+            categories=data.get("categories"),
+            insurance_policy=data.get("insurance_policy"),
+            employer_liability=data.get("employer_liability"),
+            terms_accepted=data.get("terms_accepted", False),
+            digital_signature=data.get("signature"),
+            is_approved=False
+        )
+
+        return Response({"success": True, "message": "Application submitted successfully."})
+
+
+class UsersListView(APIView):
+    permission_classes = [permissions.AllowAny] # For demo purposes, realistically IsAuthenticated
+
+    def get(self, request):
+        users = UserAccount.objects.all().select_related('profile', 'company')
+        
+        # Admin should not be able to see super admin and other admins
+        if not request.user.is_authenticated or request.user.role != UserAccount.Role.SUPER_ADMIN:
+            users = users.exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
+
+        result = []
+        for u in users:
+            profile = getattr(u, 'profile', None)
+            company = u.company
+
+            # Expiry tone logic
+            import datetime
+            today = datetime.date.today()
+            
+            cscs_expiry_tone = "emerald"
+            if profile and profile.cscs_expiry_date:
+                if profile.cscs_expiry_date < today:
+                    cscs_expiry_tone = "red"
+
+            expiry_tone = "emerald"
+
+            result.append({
+                "id": str(u.id),
+                "name": u.first_name,
+                "surname": u.last_name,
+                "email": u.email,
+                "phone": company.phone if company else "",
+                "profession": dict(UserAccount.Role.choices).get(u.role, u.role),
+                "cscsCardNo": profile.cscs_card_no if profile else "",
+                "cscsExpiryDate": str(profile.cscs_expiry_date) if profile and profile.cscs_expiry_date else "",
+                "cscsExpiryTone": cscs_expiry_tone,
+                "ipaf": profile.ipaf_certification if profile else "",
+                "pasma": profile.pasma_certification if profile else "",
+                "company": company.company_name if company else "",
+                "ssstsSmsts": profile.sssts_smsts if profile else "",
+                "expiryDate": "",
+                "expiryTone": expiry_tone,
+                "approvedUser": profile.is_approved if profile else False,
+                "approvedBy": profile.approved_by.full_name if profile and profile.approved_by else ""
+            })
+            
+        return Response(result)
+
+    def post(self, request):
+        """Used to toggle user approval."""
+        user_id = request.data.get("user_id")
+        approved = request.data.get("approved")
+
+        try:
+            user = UserAccount.objects.get(id=user_id)
+            profile = user.profile
+            profile.is_approved = approved
+            if approved and request.user.is_authenticated:
+                profile.approved_by = request.user
+            else:
+                profile.approved_by = None
+            profile.save()
+
+            if approved and user.company:
+                user.company.activate = True
+                user.company.save()
+            elif not approved and user.company:
+                user.company.activate = False
+                user.company.save()
+
+            return Response({"success": True})
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)

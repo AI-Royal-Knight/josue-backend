@@ -1,11 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, permissions
+from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 
 from drf_spectacular.utils import extend_schema
 
-from app.account.permissions import IsAdmin
+from app.account.permissions import IsAdmin, IsAdminOrProjectAdmin
 from .models import Project
 from .serializers import (
     ProjectListSerializer,
@@ -14,8 +15,31 @@ from .serializers import (
 )
 
 
+class MyProjectsView(APIView):
+    """Returns projects visible to the currently authenticated user.
+    - admin / project_admin  → all projects belonging to their company
+    - all other roles        → only the projects they are directly assigned to
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role in ["admin", "project_admin"]:
+            if not user.company:
+                return Response({"projects": [], "total_count": 0}, status=status.HTTP_200_OK)
+            projects = Project.objects.filter(company=user.company)
+        else:
+            projects = user.assigned_projects.all()
+
+        serializer = ProjectListSerializer(projects, many=True)
+        return Response(
+            {"projects": serializer.data, "total_count": projects.count()},
+            status=status.HTTP_200_OK,
+        )
+
+
 class ProjectListCreateView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrProjectAdmin]
 
     @extend_schema(responses={200: ProjectListSerializer(many=True)})
     def get(self, request):
@@ -58,7 +82,7 @@ class ProjectListCreateView(APIView):
 
 
 class ProjectDetailView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrProjectAdmin]
 
     def get_object(self, pk, company):
         try:
@@ -132,7 +156,7 @@ class ProjectDetailView(APIView):
         )
 
 class CompanyUsersView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrProjectAdmin]
 
     def get(self, request):
         if not request.user.company:
@@ -153,7 +177,7 @@ class CompanyUsersView(APIView):
 
 
 class ProjectRoleAssignmentsView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrProjectAdmin]
 
     def get(self, request, pk):
         if not request.user.company:
@@ -231,7 +255,7 @@ from .models import ProjectFolder, ProjectSubfolder
 from .serializers import ProjectFolderSerializer
 
 class ProjectFoldersView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrProjectAdmin]
 
     def get(self, request, pk):
         if not request.user.company:
@@ -284,7 +308,7 @@ class ProjectFoldersView(APIView):
 
 
 class ProjectFoldersBulkUpdateView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrProjectAdmin]
 
     def put(self, request, pk):
         if not request.user.company:
@@ -358,7 +382,7 @@ from .models import ApprovalConfiguration
 from .serializers import ApprovalConfigurationSerializer
 
 class ProjectApprovalConfigurationsView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrProjectAdmin]
 
     def get(self, request, pk):
         if not request.user.company:

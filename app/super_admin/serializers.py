@@ -37,3 +37,13 @@ class CompanyListSerializer(serializers.ModelSerializer):
             return obj.admin_users[0].email
         return None
 
+class AcceptCompanyInvitationSerializer(serializers.Serializer):
+    token = serializers.UUIDField()
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError({"password": "Passwords must match."})
+        return data
+

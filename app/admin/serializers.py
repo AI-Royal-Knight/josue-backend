@@ -59,10 +59,30 @@ class ProjectAdminInviteSerializer(serializers.Serializer):
     first_name = serializers.CharField()
     last_name = serializers.CharField()
     email = serializers.EmailField()
+    project_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list
+    )
 
 class ProjectAdminListSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserAccount
         fields = ['id', 'first_name', 'last_name', 'email', 'is_active', 'date_joined']
 
+from app.project_admin.models import Project
 
+class AdminProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = ['id', 'project_name']
+
+class ManagingDirectorInviteSerializer(serializers.Serializer):
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    email = serializers.EmailField()
+
+class ManagingDirectorListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserAccount
+        fields = ['id', 'first_name', 'last_name', 'email', 'is_active', 'date_joined']

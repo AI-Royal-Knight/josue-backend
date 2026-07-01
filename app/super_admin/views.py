@@ -9,12 +9,13 @@ from app.super_admin.services import DashboardService
 
 from app.super_admin.serializers import (
     AdminInviteSerializer,
-    CompanyListSerializer
+    CompanyListSerializer,
+    AcceptCompanyInvitationSerializer
 )
 
 from app.account.permissions import IsSuperAdmin
 from app.account.models import UserAccount, Company
-from app.super_admin.models import CompanyInvitation
+from app.super_admin.models import CompanyInvitation, MonthlyInvoice
 from app.project_admin.models import Project
 
 from django.db import transaction
@@ -91,8 +92,8 @@ class CompaniesView(APIView):
             company = Company.objects.create(
                 company_name=data["company_name"],
                 phone=data["phone_number"],
-                activate=False,
-                status=Company.Status.SUSPENDED,
+                activate=True,
+                status=Company.Status.ACTIVE,
             )
 
             admin_user = UserAccount.objects.create_user(
@@ -111,8 +112,9 @@ class CompaniesView(APIView):
                 expires_at=timezone.now() + timedelta(days=7),
             )
 
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
             invitation_link = (
-                f"https://yourfrontend.com/invitation/"
+                f"{frontend_url}/invitation/"
                 f"{invitation.token}"
             )
 
@@ -187,3 +189,116 @@ class CompanyDetailView(APIView):
 
         serializer = CompanyListSerializer(company)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+from drf_spectacular.utils import extend_schema
+
+class ValidateCompanyInvitationView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, token):
+        try:
+            invitation = CompanyInvitation.objects.select_related('user', 'company').get(token=token, accepted=False)
+            if timezone.now() > invitation.expires_at:
+                return Response({"error": "Invitation expired"}, status=status.HTTP_400_BAD_REQUEST)
+                
+            return Response({
+                "email": invitation.user.email,
+                "first_name": invitation.user.first_name,
+                "last_name": invitation.user.last_name,
+                "company_name": invitation.company.company_name,
+                "role": invitation.user.role
+            })
+        except CompanyInvitation.DoesNotExist:
+            return Response({"error": "Invalid or already accepted token"}, status=status.HTTP_404_NOT_FOUND)
+
+class AcceptCompanyInvitationView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=AcceptCompanyInvitationSerializer, responses={200: dict})
+    def post(self, request):
+        serializer = AcceptCompanyInvitationSerializer(data=request.data)
+        if not serializer.is_valid():
+            # Return first error
+            errors = []
+            for field, field_errors in serializer.errors.items():
+                if isinstance(field_errors, list):
+                    errors.append(field_errors[0])
+                else:
+                    errors.append(str(field_errors))
+            return Response({"error": errors[0] if errors else "Invalid request"}, status=status.HTTP_400_BAD_REQUEST)
+
+        token = serializer.validated_data["token"]
+        try:
+            invitation = CompanyInvitation.objects.select_related('user').get(token=token, accepted=False)
+        except CompanyInvitation.DoesNotExist:
+            return Response({"error": "Invalid or already accepted token"}, status=status.HTTP_404_NOT_FOUND)
+
+        if timezone.now() > invitation.expires_at:
+            return Response({"error": "Invitation expired"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = invitation.user
+        user.set_password(serializer.validated_data["password"])
+        user.is_active = True
+        user.save()
+
+        invitation.accepted = True
+        invitation.accepted_at = timezone.now()
+        invitation.save()
+
+        return Response({"success": True, "message": "Account activated successfully."})
+
+class MonthlyInvoiceView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        year_str = request.query_params.get("year")
+        if not year_str:
+            return Response({"error": "year query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            year = int(year_str)
+        except ValueError:
+            return Response({"error": "year must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        invoices = MonthlyInvoice.objects.filter(year=year, is_sent=True)
+        data = [
+            {
+                "id": inv.id,
+                "company_id": inv.company_id,
+                "year": inv.year,
+                "month": inv.month,
+                "amount": str(inv.amount) if inv.amount else None,
+                "is_sent": inv.is_sent
+            }
+            for inv in invoices
+        ]
+        return Response(data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        company_id = request.data.get("company_id")
+        year = request.data.get("year")
+        month = request.data.get("month")
+        amount = request.data.get("amount")
+
+        if not all([company_id, year, month]):
+            return Response({"error": "company_id, year, and month are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        invoice, created = MonthlyInvoice.objects.update_or_create(
+            company_id=company_id,
+            year=year,
+            month=month,
+            defaults={
+                "amount": amount,
+                "is_sent": True
+            }
+        )
+        
+        return Response({
+            "id": invoice.id,
+            "company_id": invoice.company_id,
+            "year": invoice.year,
+            "month": invoice.month,
+            "amount": str(invoice.amount) if invoice.amount else None,
+            "is_sent": invoice.is_sent
+        }, status=status.HTTP_200_OK)
+

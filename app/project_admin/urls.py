@@ -6,11 +6,13 @@ from .views import (
     CompanyUsersView, 
     ProjectFoldersView,
     ProjectFoldersBulkUpdateView,
-    ProjectApprovalConfigurationsView
+    ProjectApprovalConfigurationsView,
+    MyProjectsView,
 )
 
 urlpatterns = [
     path("users/", CompanyUsersView.as_view(), name="company-users"),
+    path("my-projects/", MyProjectsView.as_view(), name="my-projects"),
     path("projects/", ProjectListCreateView.as_view(), name="project-list-create"),
     path("projects/<uuid:pk>/", ProjectDetailView.as_view(), name="project-detail"),
     path("projects/<uuid:pk>/roles/", ProjectRoleAssignmentsView.as_view(), name="project-roles"),

@@ -12,6 +12,16 @@ class IsAdmin(BasePermission):
             request.user.is_authenticated
             and request.user.role in ["admin"]
         )
+
+class IsAdminOrProjectAdmin(BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and request.user.role in [
+                "admin",
+                "project_admin"
+            ]
+        )
 class IsAdminOrSuperAdmin(BasePermission):
     def has_permission(self, request, view):
         return (

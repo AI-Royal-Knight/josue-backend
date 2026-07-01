@@ -19,7 +19,7 @@ class DashboardService:
             "recent_activities": [
                 {
                     "id": activity.id,
-                    "message": activity.action,
+                    "message": activity.activity_name,
                     "created_at": activity.created_at,
                 }
                 for activity in RecentActivity.objects

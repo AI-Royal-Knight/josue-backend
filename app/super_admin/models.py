@@ -38,3 +38,22 @@ class CompanyInvitation(BaseModel):
         blank=True
     )
 
+class MonthlyInvoice(BaseModel):
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="monthly_invoices"
+    )
+    year = models.IntegerField()
+    month = models.IntegerField()  # 1-12
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    is_sent = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('company', 'year', 'month')
+

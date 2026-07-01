@@ -74,11 +74,13 @@ class UserAccount(
         ADMIN = "admin", "Admin"
         PROJECT_ADMIN = "project_admin", "Project Admin"
         MANAGING_DIRECTOR = "managing_director", "Managing Director"
+        PROJECT_DIRECTOR = "project_director", "Project Director"
+        PROCUREMENT_DEPARTMENT = "procurement_department", "Procurement Department"
+        COMMERCIAL_DEPARTMENT = "commercial_department", "Commercial Department"
         DOCUMENT_CONTROLLER = "document_controller", "Document Controller"
-        COMMERCIAL_MANAGER = "commercial_manager", "Commercial Manager"
-        PROCUREMENT = "procurement", "Procurement Department"
+        FINANCE_DEPARTMENT = "finance_department", "Finance Department"
         CONTRACTS_MANAGER = "contracts_manager", "Contracts Manager"
-        MANAGER = "manager", "Manager"
+        MANAGERS = "managers", "Managers"
         SUPERVISOR = "supervisor", "Supervisor"
         EMPLOYEE = "employee", "Employee"
         SUPPLIER = "supplier", "Supplier"
@@ -114,6 +116,12 @@ class UserAccount(
         null=True,
         blank=True,
         related_name='users'
+    )
+
+    assigned_projects = models.ManyToManyField(
+        'project_admin.Project',
+        related_name='assigned_users',
+        blank=True
     )
 
     profile_updated_at = models.DateTimeField(
@@ -215,6 +223,18 @@ class Company(BaseModel):
     )
 
     street = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+    )
+
+    town = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+    )
+
+    city = models.CharField(
         max_length=255,
         blank=True,
         null=True,
@@ -354,6 +374,13 @@ class UserProfile(BaseModel):
     
     is_approved = models.BooleanField(default=False)
     approved_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_profiles")
+
+    # Application details
+    categories = models.TextField(blank=True, null=True)
+    insurance_policy = models.CharField(max_length=100, blank=True, null=True)
+    employer_liability = models.CharField(max_length=100, blank=True, null=True)
+    terms_accepted = models.BooleanField(default=False)
+    digital_signature = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         db_table = "user_profiles"

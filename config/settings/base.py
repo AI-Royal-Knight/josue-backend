@@ -43,6 +43,18 @@ INSTALLED_APPS += [
     'app.account',
     'app.super_admin',
     'app.project_admin',
+    'app.admin',
+    'app.managing_director',
+    'app.project_director',
+    'app.procurement_department',
+    'app.commercial_department',
+    'app.document_controller',
+    'app.finance_department',
+    'app.contracts_manager',
+    'app.managers',
+    'app.supervisor',
+    'app.employee',
+    'app.supplier',
 ]
 
 # Third-party apps
@@ -233,3 +245,5 @@ EMAIL_USE_SSL = env('EMAIL_USE_SSL', cast=bool, default=True)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='')
+
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
