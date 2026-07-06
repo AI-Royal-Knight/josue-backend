@@ -247,3 +247,13 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='')
 
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
+
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+cloudinary.config(
+  cloud_name = env('CLOUD_NAME', default=''),
+  api_key = env('CLOUDINARY_API_KEY', default=''),
+  api_secret = env('CLOUDINARY_API_SECRET', default='')
+)

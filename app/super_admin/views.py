@@ -15,7 +15,7 @@ from app.super_admin.serializers import (
 
 from app.account.permissions import IsSuperAdmin
 from app.account.models import UserAccount, Company
-from app.super_admin.models import CompanyInvitation, MonthlyInvoice
+from app.super_admin.models import CompanyInvitation, MonthlyInvoice, RecentActivity
 from app.project_admin.models import Project
 
 from django.db import transaction
@@ -135,6 +135,8 @@ class CompaniesView(APIView):
                 [admin_user.email],
                 fail_silently=False,
             )
+            
+        RecentActivity.objects.create(activity_name=f"Super Admin invited {admin_user.email} as Admin for {company.company_name}.")
 
         return Response(
             {
@@ -244,6 +246,8 @@ class AcceptCompanyInvitationView(APIView):
         invitation.accepted = True
         invitation.accepted_at = timezone.now()
         invitation.save()
+
+        RecentActivity.objects.create(activity_name=f"User {user.first_name} {user.last_name} accepted the Admin invitation.")
 
         return Response({"success": True, "message": "Account activated successfully."})
 

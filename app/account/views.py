@@ -13,6 +13,7 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 
 from app.account.service import ProfileService
+from app.super_admin.models import RecentActivity
 
 from .serializers import (
     LoginSerializer,
@@ -156,20 +157,30 @@ class LoginView(APIView):
 
         tokens = get_tokens_for_user(user)
 
-        return Response(
-            {
-                "success": True,
-                "access_token": tokens["access"],
-                "refresh_token": tokens["refresh"],
-                "user": {
-                    "role": user.role,
-                    "email": user.email,
-                    "first_name": user.first_name or "",
-                    "last_name": user.last_name or "",
-                }
-            },
-            status=status.HTTP_200_OK,
-        )
+        response_data = {
+            "success": True,
+            "access_token": tokens["access"],
+            "refresh_token": tokens["refresh"],
+            "user": {
+                "role": user.role,
+                "email": user.email,
+                "first_name": user.first_name or "",
+                "last_name": user.last_name or "",
+            }
+        }
+
+        if user.role == 'employee':
+            from django.utils import timezone
+            from app.employee.models import AttendanceLog
+            today = timezone.now().date()
+            is_checked_in = AttendanceLog.objects.filter(
+                user=user,
+                date=today,
+                status='checked_in'
+            ).exists()
+            response_data["user"]["checked_in"] = is_checked_in
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class SendInvitationView(APIView):
@@ -217,10 +228,12 @@ class SendInvitationView(APIView):
         send_mail(
             subject,
             message,
-            settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
+            getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@tresta.com'),
             [email],
             fail_silently=False,
         )
+        
+        RecentActivity.objects.create(activity_name=f"{request.user.get_role_display()} invited {email} as {role_display}.")
         
         return Response({"success": True, "message": "Invitation sent successfully."})
 
@@ -288,6 +301,8 @@ class AcceptInvitationView(APIView):
         # Mark invitation as accepted
         invitation.status = Invitation.Status.ACCEPTED
         invitation.save()
+        
+        RecentActivity.objects.create(activity_name=f"User {user.first_name} {user.last_name} accepted the {user.get_role_display()} invitation.")
         
         return Response({"success": True})
 
@@ -471,7 +486,7 @@ class UsersListView(APIView):
                 "expiryDate": "",
                 "expiryTone": expiry_tone,
                 "approvedUser": profile.is_approved if profile else False,
-                "approvedBy": profile.approved_by.full_name if profile and profile.approved_by else ""
+                "approvedBy": dict(UserAccount.Role.choices).get(profile.approved_by.role, profile.approved_by.role) if profile and profile.approved_by else ""
             })
             
         return Response(result)
@@ -497,6 +512,9 @@ class UsersListView(APIView):
             elif not approved and user.company:
                 user.company.activate = False
                 user.company.save()
+
+            action = "approved" if approved else "unapproved"
+            RecentActivity.objects.create(activity_name=f"User {user.email} was {action} by {request.user.get_role_display() if request.user.is_authenticated else 'System'}.")
 
             return Response({"success": True})
         except Exception as e:

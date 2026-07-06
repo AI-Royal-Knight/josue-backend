@@ -8,6 +8,10 @@ from .views import (
     ProjectFoldersBulkUpdateView,
     ProjectApprovalConfigurationsView,
     MyProjectsView,
+    ProjectFinancialBreakdownView,
+    DashboardRFIListView,
+    RFICloseView,
+    RFIMessageCreateView,
 )
 
 urlpatterns = [
@@ -19,4 +23,8 @@ urlpatterns = [
     path("projects/<uuid:pk>/folders/", ProjectFoldersView.as_view(), name="project-folders"),
     path("projects/<uuid:pk>/folders/bulk-update/", ProjectFoldersBulkUpdateView.as_view(), name="project-folders-bulk-update"),
     path("projects/<uuid:pk>/approval-configs/", ProjectApprovalConfigurationsView.as_view(), name="project-approval-configs"),
+    path("projects/<uuid:pk>/financial-breakdown/", ProjectFinancialBreakdownView.as_view(), name="project-financial-breakdown"),
+    path("rfis/", DashboardRFIListView.as_view(), name="dashboard-rfi-list"),
+    path("rfis/<uuid:pk>/close/", RFICloseView.as_view(), name="dashboard-rfi-close"),
+    path("rfis/<uuid:pk>/messages/", RFIMessageCreateView.as_view(), name="dashboard-rfi-messages"),
 ]

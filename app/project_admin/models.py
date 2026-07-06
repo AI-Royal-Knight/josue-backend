@@ -155,3 +155,50 @@ class ApprovalConfiguration(BaseModel):
 
     def __str__(self):
         return f"{self.project.project_name} - {self.action_type} - {self.condition_value}"
+
+class LabourBooking(BaseModel):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="labour_bookings")
+    user = models.ForeignKey('account.UserAccount', on_delete=models.CASCADE, related_name="labour_bookings")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    date = models.DateField()
+    is_approved = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "labour_bookings"
+
+class ProjectValueBooking(BaseModel):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="project_value_bookings")
+    user = models.ForeignKey('account.UserAccount', on_delete=models.CASCADE, related_name="project_value_bookings")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    date = models.DateField()
+    is_approved = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "project_value_bookings"
+
+class PlantHireBooking(BaseModel):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="plant_hire_bookings")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    date = models.DateField()
+    is_approved = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "plant_hire_bookings"
+
+class LoadingClearingBooking(BaseModel):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="loading_clearing_bookings")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    date = models.DateField()
+    is_approved = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "loading_clearing_bookings"
+
+class ManagementPrelimBooking(BaseModel):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="management_prelim_bookings")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    date = models.DateField()
+    is_approved = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "management_prelim_bookings"
