@@ -18,8 +18,13 @@ class HomeView(APIView):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
 
-        total_users = UserAccount.objects.filter(company=request.user.company).count()
-        active_projects = Project.objects.filter(company=request.user.company, is_completed=False).count()
+        company = request.user.company
+        if company and company.company_name:
+            total_users = UserAccount.objects.filter(company__company_name__iexact=company.company_name).count()
+            active_projects = Project.objects.filter(company__company_name__iexact=company.company_name, is_completed=False).count()
+        else:
+            total_users = UserAccount.objects.filter(company=company).count()
+            active_projects = Project.objects.filter(company=company, is_completed=False).count()
 
         return Response({
             "total_users": total_users,
@@ -58,10 +63,16 @@ class ProjectAdminsView(APIView):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
 
-        project_admins = UserAccount.objects.filter(
-            company=request.user.company,
-            role=UserAccount.Role.PROJECT_ADMIN
-        ).order_by('-date_joined')
+        if request.user.company and request.user.company.company_name:
+            project_admins = UserAccount.objects.filter(
+                company__company_name__iexact=request.user.company.company_name,
+                role=UserAccount.Role.PROJECT_ADMIN
+            ).order_by('-date_joined')
+        else:
+            project_admins = UserAccount.objects.filter(
+                company=request.user.company,
+                role=UserAccount.Role.PROJECT_ADMIN
+            ).order_by('-date_joined')
         
         serializer = ProjectAdminListSerializer(project_admins, many=True)
         return Response({
@@ -157,7 +168,17 @@ class ManagingDirectorsView(APIView):
     def get(self, request):
         managing_directors = UserAccount.objects.filter(
             role=UserAccount.Role.MANAGING_DIRECTOR
-        ).order_by('-date_joined')
+        )
+        if request.user.company and request.user.company.company_name:
+            managing_directors = managing_directors.filter(
+                company__company_name__iexact=request.user.company.company_name
+            )
+        else:
+            managing_directors = managing_directors.filter(
+                company=request.user.company
+            )
+            
+        managing_directors = managing_directors.order_by('-date_joined')
         
         serializer = ManagingDirectorListSerializer(managing_directors, many=True)
         return Response({
@@ -246,6 +267,15 @@ class AdminProjectListView(APIView):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
 
-        projects = Project.objects.filter(company=request.user.company, is_completed=False).order_by('-created_at')
+        if request.user.company and request.user.company.company_name:
+            projects = Project.objects.filter(
+                company__company_name__iexact=request.user.company.company_name,
+                is_completed=False
+            ).order_by('-created_at')
+        else:
+            projects = Project.objects.filter(
+                company=request.user.company,
+                is_completed=False
+            ).order_by('-created_at')
         serializer = AdminProjectSerializer(projects, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

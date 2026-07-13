@@ -22,6 +22,7 @@ from .serializers import (
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
     SubmitApplicationSerializer,
+    ChangePasswordSerializer,
 )
 from .tokens import get_tokens_for_user
 from .models import Invitation, RoleAssignment, UserProfile, SupplierProfile, CompanySupplier, Company, UserAccount
@@ -66,7 +67,16 @@ class ProfileView(APIView):
         user.save()
 
         # Update profile info
-        profile_data = data.get("profile", {})
+        import json
+        profile_data_raw = data.get("profile", {})
+        if isinstance(profile_data_raw, str):
+            try:
+                profile_data = json.loads(profile_data_raw)
+            except json.JSONDecodeError:
+                profile_data = {}
+        else:
+            profile_data = profile_data_raw
+            
         if profile_data:
             try:
                 profile = user.profile
@@ -77,17 +87,30 @@ class ProfileView(APIView):
             for field in [
                 'cscs_card_no', 'cscs_expiry_date', 'ipaf_certification', 'pasma_certification',
                 'sssts_smsts', 'profession', 'emergency_contact_name', 'emergency_contact_number',
-                'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature'
+                'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature',
+                'ni_number', 'utr', 'passport_number', 'passport_expiry_date'
             ]:
                 if field in profile_data:
                     val = profile_data[field]
                     if val == "" and field.endswith('_date'):
                         val = None
                     setattr(profile, field, val)
+                    
+            if 'passport_document' in request.FILES:
+                profile.passport_document = request.FILES['passport_document']
+                
             profile.save()
 
         # Update company info
-        company_data = data.get("company", {})
+        company_data_raw = data.get("company", {})
+        if isinstance(company_data_raw, str):
+            try:
+                company_data = json.loads(company_data_raw)
+            except json.JSONDecodeError:
+                company_data = {}
+        else:
+            company_data = company_data_raw
+            
         if company_data:
             if not user.company:
                 from .models import Company
@@ -98,19 +121,42 @@ class ProfileView(APIView):
             company = user.company
             for field in [
                 'company_name', 'company_number', 'building_number', 'street', 'town', 'city', 'postcode',
-                'vat_number', 'phone', 'bank_name', 'bank_address', 'sort_code', 'account_number',
-                'iban', 'swift_bic'
+                'vat_number', 'phone', 'utr', 'bank_name', 'bank_address', 'sort_code', 'account_number',
+                'iban', 'swift_bic', 'public_liability_policy', 'public_liability_expiry', 
+                'employers_liability_policy', 'employers_liability_expiry'
             ]:
                 if field in company_data:
                     val = company_data[field]
                     if val == "":
                         val = None
                     setattr(company, field, val)
+                    
+            if 'public_liability_document' in request.FILES:
+                company.public_liability_document = request.FILES['public_liability_document']
+            if 'employers_liability_document' in request.FILES:
+                company.employers_liability_document = request.FILES['employers_liability_document']
+                
             company.save()
 
         updated_data = ProfileService.get_profile(user)
         return Response(updated_data, status=status.HTTP_200_OK)
 
+
+class LogoutView(APIView):
+    """Blacklists the refresh token to logout."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh")
+            if refresh_token:
+                from rest_framework_simplejwt.tokens import RefreshToken
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+                return Response({"message": "Successfully logged out."}, status=status.HTTP_200_OK)
+            return Response({"error": "Refresh token is required."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LoginView(APIView):
@@ -374,6 +420,28 @@ class ResetPasswordView(APIView):
 
         return Response({"success": True, "message": "Password has been successfully reset."})
 
+class ChangePasswordView(APIView):
+    """Allows an authenticated user to change their password."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=ChangePasswordSerializer, responses={200: dict})
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        old_password = serializer.validated_data["old_password"]
+        new_password = serializer.validated_data["new_password"]
+
+        if not user.check_password(old_password):
+            return Response({"error": "Incorrect current password."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"message": "Password updated successfully."}, status=status.HTTP_200_OK)
+
 
 class SubmitApplicationView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -390,19 +458,24 @@ class SubmitApplicationView(APIView):
         if UserAccount.objects.filter(email=email).exists():
             return Response({"error": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create Company
-        company = Company.objects.create(
-            company_name=data.get("company_name"),
-            company_number=data.get("company_house_number") if data.get("company_house_number") and data.get("company_house_number").isdigit() else None,
-            vat_number=data.get("company_utr"),
-            bank_name=data.get("bank_name"),
-            bank_address=data.get("bank_address"),
-            account_number=data.get("account_number"),
-            sort_code=data.get("sort_code"),
-            building_number=None, # Frontend just passes "building" string
-            street=data.get("building"),
-            postcode=data.get("postcode")
-        )
+        # Get or Create Company
+        company_name = data.get("company_name")
+        company = None
+        if company_name:
+            company = Company.objects.filter(company_name__iexact=company_name.strip()).first()
+        if not company:
+            company = Company.objects.create(
+                company_name=company_name,
+                company_number=data.get("company_house_number") if data.get("company_house_number") and data.get("company_house_number").isdigit() else None,
+                vat_number=data.get("company_utr"),
+                bank_name=data.get("bank_name"),
+                bank_address=data.get("bank_address"),
+                account_number=data.get("account_number"),
+                sort_code=data.get("sort_code"),
+                building_number=None, # Frontend just passes "building" string
+                street=data.get("building"),
+                postcode=data.get("postcode")
+            )
 
         # Create User
         user = UserAccount.objects.create(
@@ -449,9 +522,20 @@ class UsersListView(APIView):
     def get(self, request):
         users = UserAccount.objects.all().select_related('profile', 'company')
         
-        # Admin should not be able to see super admin and other admins
-        if not request.user.is_authenticated or request.user.role != UserAccount.Role.SUPER_ADMIN:
-            users = users.exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
+        if not request.user.is_authenticated:
+            users = users.none()
+        elif request.user.role == UserAccount.Role.SUPER_ADMIN:
+            pass  # Super admin sees all
+        elif request.user.role == UserAccount.Role.ADMIN:
+            if request.user.company and request.user.company.company_name:
+                users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role=UserAccount.Role.SUPER_ADMIN)
+            else:
+                users = users.filter(company=request.user.company).exclude(role=UserAccount.Role.SUPER_ADMIN)
+        else:
+            if request.user.company and request.user.company.company_name:
+                users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
+            else:
+                users = users.filter(company=request.user.company).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
 
         result = []
         for u in users:
@@ -498,7 +582,16 @@ class UsersListView(APIView):
 
         try:
             user = UserAccount.objects.get(id=user_id)
-            profile = user.profile
+            
+            # Get or create UserProfile
+            try:
+                profile = user.profile
+            except UserAccount.profile.RelatedObjectDoesNotExist:
+                profile = UserProfile.objects.create(
+                    user=user,
+                    profession=user.role
+                )
+                
             profile.is_approved = approved
             if approved and request.user.is_authenticated:
                 profile.approved_by = request.user
@@ -519,3 +612,91 @@ class UsersListView(APIView):
             return Response({"success": True})
         except Exception as e:
             return Response({"error": str(e)}, status=400)
+
+
+class NotificationListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .models import Notification
+        from .serializers import NotificationSerializer
+        notifications = Notification.objects.filter(user=request.user)
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class NotificationMarkReadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        from .models import Notification
+        try:
+            notification = Notification.objects.get(pk=pk, user=request.user)
+            notification.is_read = True
+            notification.save()
+            return Response({"success": True})
+        except Notification.DoesNotExist:
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class NotificationMarkAllReadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from .models import Notification
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({"success": True})
+
+class RequestAdminView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from .models import Company, UserAccount
+        from app.super_admin.models import CompanyInvitation, RecentActivity
+        from django.db import transaction
+        from django.utils import timezone
+        from datetime import timedelta
+        import uuid
+        
+        data = request.data
+        email = data.get("email", "").lower().strip()
+        first_name = data.get("first_name", "")
+        last_name = data.get("last_name", "")
+        company_name = data.get("company_name", "")
+        phone_number = data.get("phone_number", "")
+        
+        if not all([email, first_name, last_name, company_name, phone_number]):
+            return Response({"error": "All fields are required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if UserAccount.objects.filter(email=email).exists():
+            return Response({"error": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        with transaction.atomic():
+            company = Company.objects.filter(company_name__iexact=company_name.strip()).first()
+            if not company:
+                company = Company.objects.create(
+                    company_name=company_name,
+                    phone=phone_number,
+                    activate=False,
+                    status=Company.Status.SUSPENDED,
+                )
+            
+            admin_user = UserAccount.objects.create_user(
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                role=UserAccount.Role.ADMIN,
+                company=company,
+                is_active=False,
+            )
+            
+            invitation = CompanyInvitation.objects.create(
+                company=company,
+                user=admin_user,
+                token=uuid.uuid4(),
+                expires_at=timezone.now() + timedelta(days=7),
+            )
+            
+            RecentActivity.objects.create(
+                activity_name=f"New admin request received from {admin_user.email} for {company.company_name}."
+            )
+            
+        return Response({"success": True, "message": "Your request has been submitted successfully."}, status=status.HTTP_201_CREATED)

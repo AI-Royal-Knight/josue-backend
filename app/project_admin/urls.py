@@ -12,6 +12,16 @@ from .views import (
     DashboardRFIListView,
     RFICloseView,
     RFIMessageCreateView,
+    ProformaAccessListView,
+    ProformaAccessDetailView,
+    LoadingClearingAccessListView,
+    LoadingClearingAccessDetailView,
+)
+from .invoice_views import (
+    UserInvoiceListView,
+    UserInvoiceApproveView,
+    UserInvoicePayView,
+    UserInvoiceCommercialCommentView,
 )
 
 urlpatterns = [
@@ -27,4 +37,13 @@ urlpatterns = [
     path("rfis/", DashboardRFIListView.as_view(), name="dashboard-rfi-list"),
     path("rfis/<uuid:pk>/close/", RFICloseView.as_view(), name="dashboard-rfi-close"),
     path("rfis/<uuid:pk>/messages/", RFIMessageCreateView.as_view(), name="dashboard-rfi-messages"),
+    path("projects/<uuid:pk>/proforma-access/", ProformaAccessListView.as_view(), name="project-proforma-access"),
+    path("projects/<uuid:pk>/proforma-access/<uuid:access_pk>/", ProformaAccessDetailView.as_view(), name="project-proforma-access-detail"),
+    path("projects/<uuid:pk>/loading-clearing-access/", LoadingClearingAccessListView.as_view(), name="project-loading-clearing-access"),
+    path("projects/<uuid:pk>/loading-clearing-access/<uuid:access_pk>/", LoadingClearingAccessDetailView.as_view(), name="project-loading-clearing-access-detail"),
+    # ── User Invoices ──
+    path("user-invoices/", UserInvoiceListView.as_view(), name="user-invoice-list"),
+    path("user-invoices/<uuid:invoice_id>/approve/", UserInvoiceApproveView.as_view(), name="user-invoice-approve"),
+    path("user-invoices/<uuid:invoice_id>/pay/", UserInvoicePayView.as_view(), name="user-invoice-pay"),
+    path("user-invoices/<uuid:invoice_id>/commercial-comment/", UserInvoiceCommercialCommentView.as_view(), name="user-invoice-commercial-comment"),
 ]

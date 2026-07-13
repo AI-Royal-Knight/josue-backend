@@ -1,5 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from decimal import Decimal, InvalidOperation
+from datetime import datetime
 from rest_framework import status, permissions
 from drf_spectacular.utils import extend_schema
 from app.project_admin.models import Project
@@ -72,6 +74,8 @@ class EmployeeAssignProjectView(APIView):
 
 from django.utils import timezone
 from .models import AttendanceLog
+from app.project_admin.models import VariationsAccess
+from app.commercial_department.models import Variation
 
 class AttendanceStatusView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -89,11 +93,21 @@ class AttendanceStatusView(APIView):
         ).first()
 
         if active_log:
+            has_variations_access = VariationsAccess.objects.filter(
+                project=active_log.project,
+                user=request.user,
+                is_active=True
+            ).exists()
+
+            next_variation_no = f"VO-{str(Variation.objects.count() + 1).zfill(3)}"
+
             return Response({
                 "status": "checked_in",
                 "project_id": str(active_log.project.id),
                 "project_name": active_log.project.project_name,
-                "check_in_time": active_log.check_in_time
+                "check_in_time": active_log.check_in_time,
+                "has_variations_access": has_variations_access,
+                "next_variation_no": next_variation_no
             }, status=status.HTTP_200_OK)
         else:
             return Response({"status": "checked_out"}, status=status.HTTP_200_OK)
@@ -225,16 +239,77 @@ class MyFoldersView(APIView):
                     "subfolders": []
                 }
 
+            calculated_labour_target = 0
+            if subfolder.rows:
+                for row in subfolder.rows:
+                    val = row.get("labourTarget", 0)
+                    try:
+                        calculated_labour_target += float(val) if val else 0
+                    except (ValueError, TypeError):
+                        pass
+            if calculated_labour_target == 0 and subfolder.labour_target:
+                calculated_labour_target = float(subfolder.labour_target)
+
             folder_map[folder_id]["subfolders"].append({
                 "id": str(subfolder.id),
                 "name": subfolder.name,
                 "project_value": str(subfolder.project_value),
-                "labour_target": str(subfolder.labour_target),
+                "labour_target": str(calculated_labour_target),
                 "rows": subfolder.rows,
                 "hide_labour_target": assignment.hide_labour_target,
+                "assignment_id": str(assignment.id),
+                "employee_labour_value": str(assignment.employee_labour_value) if assignment.employee_labour_value is not None else None,
             })
 
         return Response({"folders": list(folder_map.values())}, status=status.HTTP_200_OK)
+
+
+class SubmitLabourTargetView(APIView):
+    """
+    Allows an employee to submit their own labour target value if the management's
+    target is hidden.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, assignment_id):
+        if request.user.role != 'employee':
+            return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
+
+        from app.project_admin.models import FolderAssignment
+        try:
+            assignment = FolderAssignment.objects.get(id=assignment_id, user=request.user)
+        except FolderAssignment.DoesNotExist:
+            return Response({"error": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not assignment.hide_labour_target:
+            return Response({"error": "Cannot submit value because labour target is not hidden."}, status=status.HTTP_400_BAD_REQUEST)
+
+        value = request.data.get('employee_labour_value')
+        if value is None:
+            return Response({"error": "employee_labour_value is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            assignment.employee_labour_value = float(value)
+            assignment.save()
+
+            # Auto-generate a UserInvoice
+            try:
+                from app.project_admin.models import UserInvoice
+                UserInvoice.objects.create(
+                    project=assignment.subfolder.folder.project,
+                    created_by=request.user,
+                    source_type=UserInvoice.SourceType.LABOUR_TARGET,
+                    source_id=str(assignment.id),
+                    work_area=assignment.subfolder.name,
+                    description=f"Labour Target – {assignment.subfolder.name}",
+                    total=float(value),
+                )
+            except Exception:
+                pass  # Don't fail the main response if invoice creation fails
+
+            return Response({"message": "Labour target submitted successfully."}, status=status.HTTP_200_OK)
+        except ValueError:
+            return Response({"error": "Invalid value provided."}, status=status.HTTP_400_BAD_REQUEST)
 
 from .models import RFI
 from .serializers import RFISerializer, DailyRegisterSerializer
@@ -352,8 +427,12 @@ class RAMSCreateView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
+        if request.user.role not in ['manager', 'project_director', 'admin', 'super_admin']:
+            return Response({"error": "Only managers can create operations."}, status=status.HTTP_403_FORBIDDEN)
+            
         project_id = request.data.get('project_id')
         title = request.data.get('title')
+        description = request.data.get('description')
         date = request.data.get('date')
         review_date = request.data.get('review_date')
         attachment = request.FILES.get('attachment')
@@ -381,6 +460,7 @@ class RAMSCreateView(APIView):
             project_id=project_id,
             created_by=request.user,
             title=title,
+            description=description,
             date=date,
             review_date=review_date if review_date else None,
             document_url=document_url
@@ -392,8 +472,12 @@ class DailyBriefingCreateView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
+        if request.user.role not in ['manager', 'project_director', 'admin', 'super_admin']:
+            return Response({"error": "Only managers can create operations."}, status=status.HTTP_403_FORBIDDEN)
+            
         project_id = request.data.get('project_id')
         title = request.data.get('title')
+        description = request.data.get('description')
         date = request.data.get('date')
         attachment = request.FILES.get('attachment')
         
@@ -421,6 +505,7 @@ class DailyBriefingCreateView(APIView):
                 project_id=project_id,
                 created_by=request.user,
                 title=title,
+                description=description,
                 date=date,
                 document_url=document_url
             )
@@ -434,8 +519,12 @@ class ToolboxTalkCreateView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
+        if request.user.role not in ['manager', 'project_director', 'admin', 'super_admin']:
+            return Response({"error": "Only managers can create operations."}, status=status.HTTP_403_FORBIDDEN)
+            
         project_id = request.data.get('project_id')
         title = request.data.get('title')
+        description = request.data.get('description')
         date = request.data.get('date')
         attachment = request.FILES.get('attachment')
         
@@ -462,17 +551,68 @@ class ToolboxTalkCreateView(APIView):
             project_id=project_id,
             created_by=request.user,
             title=title,
+            description=description,
             date=date,
             document_url=document_url
         )
         return Response(ToolboxTalkSerializer(toolbox).data, status=status.HTTP_201_CREATED)
 
+class OperationCompleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def patch(self, request, op_type, op_id):
+        from django.utils import timezone
+        
+        models_map = {
+            'rams': RAMS,
+            'briefings': DailyBriefing,
+            'toolbox-talks': ToolboxTalk,
+            'todos': ToDoList
+        }
+        
+        if op_type not in models_map:
+            return Response({"error": "Invalid operation type"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        model = models_map[op_type]
+        try:
+            instance = model.objects.get(id=op_id)
+        except model.DoesNotExist:
+            return Response({"error": "Operation not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+        attachment = request.FILES.get('signature')
+        signed_document_url = None
+        
+        if attachment:
+            try:
+                upload_result = cloudinary.uploader.upload(
+                    attachment,
+                    resource_type='auto',
+                    folder=f"josue_operations/{instance.project.id}/signatures/{op_type}"
+                )
+                signed_document_url = upload_result.get('secure_url')
+            except Exception as e:
+                return Response({"error": f"Failed to upload document: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+                
+        instance.completed_at = timezone.now()
+        if signed_document_url:
+            instance.signed_document_url = signed_document_url
+            
+        if op_type == 'todos':
+            instance.completion_date = timezone.now().date()
+            
+        instance.save()
+        return Response({"message": "Operation completed successfully"}, status=status.HTTP_200_OK)
+
 class ToDoCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        if request.user.role != 'manager':
+            return Response({"error": "Only managers can create To Do items."}, status=status.HTTP_403_FORBIDDEN)
         project_id = request.data.get('project_id')
         title = request.data.get('title')
+        description = request.data.get('description')
         date = request.data.get('date')
         completion_date = request.data.get('completion_date')
         assign_user = request.data.get('assign_user')
@@ -488,6 +628,7 @@ class ToDoCreateView(APIView):
             project_id=project_id,
             created_by=request.user,
             title=title,
+            description=description,
             date=date,
             completion_date=completion_date if completion_date else None,
             assign_user=assign_user
@@ -509,3 +650,174 @@ class CompanyEmployeeListView(APIView):
         user_list = [{"id": str(u.id), "name": u.full_name} for u in users]
         
         return Response({"users": user_list}, status=status.HTTP_200_OK)
+
+class LoadingClearingSubmitView(APIView):
+    """
+    Submit a Loading & Clearing booking.
+    The employee must have an active LoadingClearingAccess for their current project.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'employee':
+            return Response({"error": "Only employees can submit loading & clearing"}, status=status.HTTP_403_FORBIDDEN)
+
+        # 1. Get the employee's active project from AttendanceLog
+        today = timezone.localtime().date()
+        try:
+            attendance = AttendanceLog.objects.filter(
+                user=request.user,
+                date=today,
+                check_in_time__isnull=False,
+                check_out_time__isnull=True
+            ).latest('check_in_time')
+            active_project = attendance.project
+        except AttendanceLog.DoesNotExist:
+            return Response({"error": "You must be checked into a project to submit loading & clearing."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Check if user has LoadingClearingAccess for this project
+        has_access = LoadingClearingAccess.objects.filter(
+            project=active_project,
+            user=request.user,
+            is_active=True
+        ).exists()
+
+        if not has_access:
+            return Response({"error": "You do not have Loading & Clearing access for this project."}, status=status.HTTP_403_FORBIDDEN)
+
+        # 3. Extract and validate data
+        data = request.data
+        try:
+            amount = Decimal(data.get("amount", 0))
+            date_str = data.get("date")
+            description = data.get("description", "")
+            if not date_str:
+                return Response({"error": "Date is required"}, status=status.HTTP_400_BAD_REQUEST)
+            booking_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except (ValueError, TypeError, InvalidOperation):
+            return Response({"error": "Invalid data format provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 4. Handle attachments
+        attachment_urls = []
+        attachments = request.FILES.getlist('attachments')
+        for f in attachments:
+            try:
+                import cloudinary.uploader
+                upload_result = cloudinary.uploader.upload(
+                    f,
+                    folder="josue/loading_clearing",
+                    resource_type="auto"
+                )
+                attachment_urls.append(upload_result.get('secure_url'))
+            except Exception as e:
+                return Response({"error": f"Failed to upload attachment: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 5. Create the booking
+        booking = LoadingClearingBooking.objects.create(
+            project=active_project,
+            user=request.user,
+            amount=amount,
+            description=description,
+            attachment_urls=attachment_urls,
+            date=booking_date
+        )
+
+        # 6. Auto-generate a UserInvoice
+        try:
+            from app.project_admin.models import UserInvoice
+            UserInvoice.objects.create(
+                project=active_project,
+                created_by=request.user,
+                source_type=UserInvoice.SourceType.LOADING_CLEARING,
+                source_id=str(booking.id),
+                description=description or "Loading & Clearing submission",
+                total=amount,
+            )
+        except Exception:
+            pass  # Don't fail the main response if invoice creation fails
+
+        return Response({
+            "message": "Loading and clearing submitted successfully.",
+            "booking_id": booking.id
+        }, status=status.HTTP_201_CREATED)
+
+class VariationSubmitView(APIView):
+    """
+    Submit a Variation booking.
+    The employee must be checked into a project.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'employee':
+            return Response({"error": "Only employees can submit variations"}, status=status.HTTP_403_FORBIDDEN)
+
+        # 1. Get the employee's active project from AttendanceLog
+        today = timezone.localtime().date()
+        try:
+            attendance = AttendanceLog.objects.filter(
+                user=request.user,
+                date=today,
+                check_in_time__isnull=False,
+                check_out_time__isnull=True
+            ).latest('check_in_time')
+            active_project = attendance.project
+        except AttendanceLog.DoesNotExist:
+            return Response({"error": "You must be checked into a project to submit variations."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Check if user has VariationsAccess for this project
+        has_access = VariationsAccess.objects.filter(
+            project=active_project,
+            user=request.user,
+            is_active=True
+        ).exists()
+
+        # 3. Extract data
+        data = request.data
+        description = data.get("description", "")
+        comments = data.get("comments", "")
+        
+        labour_target = Decimal('0')
+        if has_access:
+            try:
+                labour_target_val = data.get("labour_target", 0)
+                if labour_target_val:
+                    labour_target = Decimal(str(labour_target_val))
+            except (ValueError, TypeError, InvalidOperation):
+                pass
+
+        # 4. Create the variation
+        from app.commercial_department.models import Variation, VariationLine
+        
+        variation = Variation.objects.create(
+            project=active_project,
+            created_by=request.user,
+            description_of_works=description,
+            comments=comments
+        )
+        
+        if labour_target > 0:
+            VariationLine.objects.create(
+                variation=variation,
+                labour_target=labour_target
+            )
+
+        # 5. Auto-generate a UserInvoice
+        try:
+            from app.project_admin.models import UserInvoice
+            UserInvoice.objects.create(
+                project=active_project,
+                created_by=request.user,
+                source_type=UserInvoice.SourceType.VARIATION,
+                source_id=str(variation.id),
+                variation_sheet_no=variation.vo_number,
+                description=description or "Variation submission",
+                total=variation.total_amount,
+            )
+        except Exception:
+            pass  # Don't fail the main response if invoice creation fails
+
+        return Response({
+            "message": "Variation submitted successfully.",
+            "variation_id": variation.id
+        }, status=status.HTTP_201_CREATED)

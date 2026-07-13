@@ -16,8 +16,8 @@ class RFISerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         if obj.created_by:
-            if hasattr(obj.created_by, 'profile') and obj.created_by.profile:
-                return f"{obj.created_by.profile.first_name} {obj.created_by.profile.last_name}"
+            if obj.created_by.first_name or obj.created_by.last_name:
+                return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
             return obj.created_by.email
         return "Unknown"
 
@@ -87,25 +87,25 @@ class RAMSSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RAMS
-        fields = ['id', 'project', 'project_name', 'title', 'date', 'review_date', 'document_url']
+        fields = ['id', 'project', 'project_name', 'title', 'description', 'date', 'review_date', 'document_url', 'signed_document_url', 'completed_at']
 
 class DailyBriefingSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.project_name', read_only=True)
 
     class Meta:
         model = DailyBriefing
-        fields = ['id', 'project', 'project_name', 'title', 'date', 'document_url']
+        fields = ['id', 'project', 'project_name', 'title', 'description', 'date', 'document_url', 'signed_document_url', 'completed_at']
 
 class ToolboxTalkSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.project_name', read_only=True)
 
     class Meta:
         model = ToolboxTalk
-        fields = ['id', 'project', 'project_name', 'title', 'date', 'document_url']
+        fields = ['id', 'project', 'project_name', 'title', 'description', 'date', 'document_url', 'signed_document_url', 'completed_at']
 
 class ToDoListSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.project_name', read_only=True)
 
     class Meta:
         model = ToDoList
-        fields = ['id', 'project', 'project_name', 'title', 'date', 'completion_date', 'assign_user']
+        fields = ['id', 'project', 'project_name', 'title', 'description', 'date', 'completion_date', 'assign_user', 'signed_document_url', 'completed_at']

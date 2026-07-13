@@ -105,5 +105,27 @@ from .models import ApprovalConfiguration
 class ApprovalConfigurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApprovalConfiguration
-        fields = ['id', 'action_type', 'condition_value', 'required_roles', 'is_active']
+        fields = ['id', 'action_type', 'condition_value', 'required_roles', 'toggle_states', 'is_active']
 
+
+from .models import ProformaAccess
+
+class ProformaAccessSerializer(serializers.ModelSerializer):
+    user = UserAccountMinimalSerializer(read_only=True)
+    user_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = ProformaAccess
+        fields = ['id', 'project', 'user', 'user_id', 'is_active', 'created_at']
+        read_only_fields = ['project', 'created_at']
+
+from .models import LoadingClearingAccess
+
+class LoadingClearingAccessSerializer(serializers.ModelSerializer):
+    user = UserAccountMinimalSerializer(read_only=True)
+    user_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = LoadingClearingAccess
+        fields = ['id', 'project', 'user', 'user_id', 'is_active', 'created_at']
+        read_only_fields = ['project', 'created_at']

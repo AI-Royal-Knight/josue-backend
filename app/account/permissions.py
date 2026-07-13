@@ -31,3 +31,47 @@ class IsAdminOrSuperAdmin(BasePermission):
                 "admin"
             ]
         )
+
+class CanManageProjectFolders(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.role in ["admin", "project_admin", "managing_director", "project_director"]:
+            return True
+            
+        pk = view.kwargs.get('pk')
+        if not pk:
+            return False
+            
+        from app.account.models import RoleAssignment
+        return RoleAssignment.objects.filter(
+            user=request.user,
+            project_id=pk,
+            role__in=["contracts_manager", "managers", "supervisor", "managing_director", "project_director"]
+        ).exists()
+
+class CanManageProjectRoles(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.role in ["admin", "project_admin", "managing_director", "project_director"]:
+            return True
+            
+        pk = view.kwargs.get('pk')
+        if not pk:
+            return False
+            
+        from app.account.models import RoleAssignment
+        return RoleAssignment.objects.filter(
+            user=request.user,
+            project_id=pk,
+            role__in=["contracts_manager", "managers", "supervisor", "managing_director", "project_director"]
+        ).exists()
+
+class IsAdminOrProjectAdminOrCompanyManager(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.role in ["admin", "project_admin", "managing_director", "project_director", "contracts_manager", "managers", "supervisor"]:
+            return True
+        return False

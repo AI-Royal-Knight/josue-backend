@@ -123,6 +123,7 @@ class FolderAssignment(BaseModel):
     user = models.ForeignKey('account.UserAccount', on_delete=models.CASCADE, related_name="folder_assignments")
     hide_labour_target = models.BooleanField(default=False)
     is_management_assignment = models.BooleanField(default=False)
+    employee_labour_value = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
 
     class Meta:
         db_table = "folder_assignments"
@@ -138,6 +139,7 @@ class ApprovalConfiguration(BaseModel):
         VARIATIONS = "variations", "Variations"
         PURCHASE_ORDER = "purchase_order", "Purchase Orders"
         PROFORMA = "proforma", "Proforma Nr Invoices"
+        USER_VARIATIONS_INVOICE = "user_variations_invoice", "User Variations Invoices"
         
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="approval_configs")
     action_type = models.CharField(max_length=50, choices=ActionType.choices)
@@ -147,6 +149,8 @@ class ApprovalConfiguration(BaseModel):
     
     # Store roles that need to sign. e.g. "supervisor,contracts_manager" (comma separated)
     required_roles = models.CharField(max_length=255)
+    
+    toggle_states = models.JSONField(default=list)
     
     is_active = models.BooleanField(default=True)
 
@@ -187,7 +191,10 @@ class PlantHireBooking(BaseModel):
 
 class LoadingClearingBooking(BaseModel):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="loading_clearing_bookings")
+    user = models.ForeignKey('account.UserAccount', on_delete=models.CASCADE, related_name="loading_clearing_bookings", null=True, blank=True)
     amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    description = models.TextField(blank=True, null=True)
+    attachment_urls = models.JSONField(default=list, blank=True)
     date = models.DateField()
     is_approved = models.BooleanField(default=False)
 
@@ -202,3 +209,153 @@ class ManagementPrelimBooking(BaseModel):
 
     class Meta:
         db_table = "management_prelim_bookings"
+
+class ProformaAccess(BaseModel):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="proforma_accesses")
+    user = models.ForeignKey('account.UserAccount', on_delete=models.CASCADE, related_name="proforma_accesses")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "proforma_accesses"
+        unique_together = ('project', 'user')
+
+    def __str__(self):
+        return f"{self.user.email} - Proforma Access on {self.project.project_name}"
+
+class LoadingClearingAccess(BaseModel):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="loading_clearing_accesses")
+    user = models.ForeignKey('account.UserAccount', on_delete=models.CASCADE, related_name="loading_clearing_accesses")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "loading_clearing_accesses"
+        unique_together = ('project', 'user')
+
+    def __str__(self):
+        return f"{self.user.email} - Loading & Clearing Access on {self.project.project_name}"
+
+class VariationsAccess(BaseModel):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="variations_accesses")
+    user = models.ForeignKey('account.UserAccount', on_delete=models.CASCADE, related_name="variations_accesses")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "variations_accesses"
+        unique_together = ('project', 'user')
+
+    def __str__(self):
+        return f"{self.user.email} - Variations Access on {self.project.project_name}"
+
+
+class UserInvoice(BaseModel):
+    """
+    Auto-generated invoice when an employee submits work via the app.
+    Sources: variation, labour_target, proforma, loading_clearing
+    """
+
+    class SourceType(models.TextChoices):
+        VARIATION = "variation", "Variation"
+        LABOUR_TARGET = "labour_target", "Labour Target"
+        PROFORMA = "proforma", "Proforma NR"
+        LOADING_CLEARING = "loading_clearing", "Loading & Clearing"
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="user_invoices"
+    )
+    created_by = models.ForeignKey(
+        "account.UserAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="user_invoices",
+    )
+
+    invoice_number = models.CharField(max_length=30, unique=True, blank=True)
+    source_type = models.CharField(max_length=30, choices=SourceType.choices)
+    source_id = models.CharField(max_length=100, blank=True, default="")
+    variation_sheet_no = models.CharField(max_length=50, blank=True, default="")
+    proforma_no = models.CharField(max_length=50, blank=True, default="")
+    work_area = models.CharField(max_length=255, blank=True, default="")
+    work_section = models.CharField(max_length=255, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    total = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    date = models.DateField(auto_now_add=True)
+
+    # ── 4-stage management approval chain ─────────────────────
+    supervisor_approved = models.BooleanField(default=False)
+    supervisor_approved_date = models.DateField(null=True, blank=True)
+    supervisor_approved_by = models.ForeignKey(
+        "account.UserAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="supervisor_approved_invoices",
+    )
+
+    contracts_manager_approved = models.BooleanField(default=False)
+    contracts_manager_approved_date = models.DateField(null=True, blank=True)
+    contracts_manager_approved_by = models.ForeignKey(
+        "account.UserAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cm_approved_invoices",
+    )
+
+    project_director_approved = models.BooleanField(default=False)
+    project_director_approved_date = models.DateField(null=True, blank=True)
+    project_director_approved_by = models.ForeignKey(
+        "account.UserAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pd_approved_invoices",
+    )
+
+    managing_director_approved = models.BooleanField(default=False)
+    managing_director_approved_date = models.DateField(null=True, blank=True)
+    managing_director_approved_by = models.ForeignKey(
+        "account.UserAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="md_approved_invoices",
+    )
+
+    # ── Finance paid status ───────────────────────────────────
+    finance_paid = models.BooleanField(default=False)
+    finance_paid_date = models.DateField(null=True, blank=True)
+    finance_paid_by = models.ForeignKey(
+        "account.UserAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="finance_paid_invoices",
+    )
+    finance_comments = models.TextField(blank=True, default="")
+    commercial_comments = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "user_invoices"
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.invoice_number:
+            import datetime
+            year = datetime.date.today().year
+            count = UserInvoice.objects.filter(
+                date__year=year
+            ).count() + 1
+            self.invoice_number = f"INV-{year}-{str(count).zfill(4)}"
+        super().save(*args, **kwargs)
+
+    @property
+    def fully_approved(self):
+        return (
+            self.supervisor_approved
+            and self.contracts_manager_approved
+            and self.project_director_approved
+            and self.managing_director_approved
+        )
+
+    def __str__(self):
+        return f"{self.invoice_number} - {self.project.project_name}"

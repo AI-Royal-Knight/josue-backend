@@ -44,7 +44,7 @@ class CompaniesView(APIView):
                 queryset=UserAccount.objects.filter(role=UserAccount.Role.ADMIN), 
                 to_attr='admin_users'
             )
-        ).all()
+        ).order_by('-created_at')
         
         serializer = CompanyListSerializer(companies, many=True)
         
@@ -88,13 +88,14 @@ class CompaniesView(APIView):
             )
 
         with transaction.atomic():
-
-            company = Company.objects.create(
-                company_name=data["company_name"],
-                phone=data["phone_number"],
-                activate=True,
-                status=Company.Status.ACTIVE,
-            )
+            company = Company.objects.filter(company_name__iexact=data["company_name"].strip()).first()
+            if not company:
+                company = Company.objects.create(
+                    company_name=data["company_name"],
+                    phone=data["phone_number"],
+                    activate=True,
+                    status=Company.Status.ACTIVE,
+                )
 
             admin_user = UserAccount.objects.create_user(
                 email=data["email"],
@@ -163,9 +164,45 @@ class CompanyDetailView(APIView):
         data = request.data
 
         if "activate" in data:
+            old_activate = company.activate
             company.activate = data["activate"]
             if company.activate:
                 company.status = Company.Status.ACTIVE
+                if not old_activate:
+                    admin_users = UserAccount.objects.filter(company=company, role=UserAccount.Role.ADMIN)
+                    for admin_user in admin_users:
+                        try:
+                            invitation = CompanyInvitation.objects.get(company=company, user=admin_user, accepted=False)
+                            invitation.expires_at = timezone.now() + timedelta(days=7)
+                            invitation.save()
+                            
+                            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+                            invitation_link = f"{frontend_url}/invitation/{invitation.token}"
+                            
+                            subject = 'Your Admin Request has been Approved'
+                            message = (
+                                f'Hello {admin_user.first_name},\n\n'
+                                f'Your request to join as an Admin for {company.company_name} has been approved.\n'
+                                f'Please use the following link to set up your account password:\n'
+                                f'{invitation_link}\n\n'
+                                f'This link will expire in 7 days.\n\n'
+                                f'Thank you.'
+                            )
+                            send_mail(
+                                subject,
+                                message,
+                                settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
+                                [admin_user.email],
+                                fail_silently=False,
+                            )
+                            
+                            RecentActivity.objects.create(
+                                activity_name=f"Super Admin approved request and sent invitation to {admin_user.email}."
+                            )
+                        except CompanyInvitation.DoesNotExist:
+                            pass
+                        except CompanyInvitation.MultipleObjectsReturned:
+                            pass
             else:
                 company.status = Company.Status.SUSPENDED
 

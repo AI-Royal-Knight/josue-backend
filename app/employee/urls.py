@@ -15,7 +15,11 @@ from .views import (
     DailyBriefingCreateView,
     ToolboxTalkCreateView,
     ToDoCreateView,
+    OperationCompleteView,
+    LoadingClearingSubmitView,
+    VariationSubmitView,
     CompanyEmployeeListView,
+    SubmitLabourTargetView,
 )
 
 app_name = 'employee'
@@ -28,6 +32,7 @@ urlpatterns = [
     path('attendance/check-in/', CheckInView.as_view(), name='check-in'),
     path('attendance/check-out/', CheckOutView.as_view(), name='check-out'),
     path('my-folders/', MyFoldersView.as_view(), name='my-folders'),
+    path('labour-target/submit/<uuid:assignment_id>/', SubmitLabourTargetView.as_view(), name='submit-labour-target'),
     path('rfis/', RFIListView.as_view(), name='rfi-list'),
     path('rfis/create/', RFICreateView.as_view(), name='rfi-create'),
     path('daily-register/', DailyRegister.as_view(), name='daily-register'),
@@ -36,5 +41,8 @@ urlpatterns = [
     path('operations/briefings/create/', DailyBriefingCreateView.as_view(), name='briefing-create'),
     path('operations/toolbox-talks/create/', ToolboxTalkCreateView.as_view(), name='toolbox-talk-create'),
     path('operations/todos/create/', ToDoCreateView.as_view(), name='todo-create'),
+    path('operations/<str:op_type>/<int:op_id>/complete/', OperationCompleteView.as_view(), name='operation-complete'),
+    path('loading-clearing/submit/', LoadingClearingSubmitView.as_view(), name='loading_clearing_submit'),
+    path('variations/submit/', VariationSubmitView.as_view(), name='variation_submit'),
     path('company-employees/', CompanyEmployeeListView.as_view(), name='company-employees'),
 ]

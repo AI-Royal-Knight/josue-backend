@@ -11,6 +11,8 @@ urlpatterns = [
     path('api/v1/document-controller/', include('app.document_controller.urls')),
     path('api/v1/employee/', include('app.employee.urls')),
     path('api/v1/commercial/', include('app.commercial_department.urls')),
+    path('api/v1/procurement/', include('app.procurement_department.urls')),
+    path('api/v1/contracts-manager/', include('app.contracts_manager.urls')),
     
     # Swagger / OpenAPI
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

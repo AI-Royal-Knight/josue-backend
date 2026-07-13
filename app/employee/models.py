@@ -90,9 +90,12 @@ class RAMS(BaseModel):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='rams')
     created_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, related_name='rams_created')
     title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
     date = models.DateField()
     review_date = models.DateField(null=True, blank=True)
     document_url = models.URLField(max_length=500, blank=True, null=True)
+    signed_document_url = models.URLField(max_length=500, blank=True, null=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-date']
@@ -104,8 +107,11 @@ class DailyBriefing(BaseModel):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='daily_briefings')
     created_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, related_name='daily_briefings_created')
     title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
     date = models.DateField()
     document_url = models.URLField(max_length=500, blank=True, null=True)
+    signed_document_url = models.URLField(max_length=500, blank=True, null=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-date']
@@ -117,8 +123,11 @@ class ToolboxTalk(BaseModel):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='toolbox_talks')
     created_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, related_name='toolbox_talks_created')
     title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
     date = models.DateField()
     document_url = models.URLField(max_length=500, blank=True, null=True)
+    signed_document_url = models.URLField(max_length=500, blank=True, null=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-date']
@@ -130,9 +139,12 @@ class ToDoList(BaseModel):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='todos')
     created_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, related_name='todos_created')
     title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
     date = models.DateField()
     completion_date = models.DateField(null=True, blank=True)
     assign_user = models.CharField(max_length=255, blank=True, null=True)
+    signed_document_url = models.URLField(max_length=500, blank=True, null=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-date']

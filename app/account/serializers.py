@@ -5,9 +5,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = [
-            'cscs_card_no', 'cscs_expiry_date', 'ipaf_certification', 'pasma_certification', 
+            'employee_id', 'cscs_card_no', 'cscs_expiry_date', 'ipaf_certification', 'pasma_certification', 
             'sssts_smsts', 'profession', 'emergency_contact_name', 'emergency_contact_number',
-            'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature'
+            'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature',
+            'ni_number', 'utr', 'passport_number', 'passport_expiry_date', 'passport_document'
         ]
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -15,13 +16,16 @@ class CompanySerializer(serializers.ModelSerializer):
         model = Company
         fields = [
             'id', 'company_name', 'company_number', 'building_number', 'street', 'town', 'city', 'postcode',
-            'vat_number', 'phone', 'bank_name', 'bank_address', 'sort_code', 'account_number',
-            'iban', 'swift_bic'
+            'vat_number', 'phone', 'utr', 'bank_name', 'bank_address', 'sort_code', 'account_number',
+            'iban', 'swift_bic', 'public_liability_policy', 'public_liability_expiry', 
+            'public_liability_document', 'employers_liability_policy', 'employers_liability_expiry', 
+            'employers_liability_document'
         ]
 
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(read_only=True)
     company = CompanySerializer(read_only=True)
+    stats = serializers.SerializerMethodField()
     
     class Meta:
         model = UserAccount
@@ -33,8 +37,17 @@ class UserSerializer(serializers.ModelSerializer):
             'last_name',
             'role',
             'profile',
-            'company'
+            'company',
+            'stats'
         ]
+        
+    def get_stats(self, obj):
+        # Temporary mock stats for UI until further specification
+        return {
+            "total": 5,
+            "approved": 1,
+            "pending": 3
+        }
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -64,6 +77,10 @@ class ForgotPasswordSerializer(serializers.Serializer):
 class ResetPasswordSerializer(serializers.Serializer):
     uid = serializers.CharField()
     token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True)
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True)
 
 
@@ -113,3 +130,13 @@ class SubmitApplicationSerializer(serializers.Serializer):
     # Terms & Signature
     terms_accepted = serializers.BooleanField()
     signature = serializers.CharField()
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import Notification
+        model = Notification
+        fields = [
+            'id', 'title', 'body', 'type', 'is_read', 'created_at'
+        ]
+

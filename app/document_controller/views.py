@@ -24,7 +24,7 @@ class InviteEmployeeView(APIView):
 
     @extend_schema(request=InviteEmployeeSerializer, responses={200: dict})
     def post(self, request):
-        if request.user.role not in [UserAccount.Role.DOCUMENT_CONTROLLER, UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN]:
+        if request.user.role not in [UserAccount.Role.DOCUMENT_CONTROLLER, UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN, UserAccount.Role.PROJECT_ADMIN]:
             return Response({"error": "You do not have permission to invite employees."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = InviteEmployeeSerializer(data=request.data)

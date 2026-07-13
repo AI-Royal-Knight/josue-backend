@@ -258,6 +258,42 @@ class Company(BaseModel):
         blank=True,
     )
 
+    utr = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+
+    public_liability_policy = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+    )
+    public_liability_expiry = models.DateField(
+        blank=True,
+        null=True,
+    )
+    public_liability_document = models.FileField(
+        upload_to="companies/insurance/",
+        blank=True,
+        null=True,
+    )
+
+    employers_liability_policy = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+    )
+    employers_liability_expiry = models.DateField(
+        blank=True,
+        null=True,
+    )
+    employers_liability_document = models.FileField(
+        upload_to="companies/insurance/",
+        blank=True,
+        null=True,
+    )
+
     # Bank Details
     bank_name = models.CharField(
         max_length=255,
@@ -359,6 +395,7 @@ class RoleAssignment(BaseModel):
 
 class UserProfile(BaseModel):
     user = models.OneToOneField(UserAccount, on_delete=models.CASCADE, related_name="profile")
+    employee_id = models.CharField(max_length=50, blank=True, null=True)
     
     # Certifications
     cscs_card_no = models.CharField(max_length=50, blank=True, null=True)
@@ -371,6 +408,13 @@ class UserProfile(BaseModel):
     # Emergency Contact
     emergency_contact_name = models.CharField(max_length=255, blank=True, null=True)
     emergency_contact_number = models.CharField(max_length=50, blank=True, null=True)
+
+    # Tax & Identity
+    ni_number = models.CharField(max_length=50, blank=True, null=True)
+    utr = models.CharField(max_length=100, blank=True, null=True)
+    passport_number = models.CharField(max_length=100, blank=True, null=True)
+    passport_expiry_date = models.DateField(blank=True, null=True)
+    passport_document = models.FileField(upload_to="profiles/documents/", blank=True, null=True)
     
     is_approved = models.BooleanField(default=False)
     approved_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_profiles")
@@ -444,3 +488,25 @@ class Invitation(BaseModel):
 
     def __str__(self):
         return f"Invite {self.email} as {self.role}"
+
+
+class Notification(BaseModel):
+    class Type(models.TextChoices):
+        PROJECT_ASSIGNED = "project_assigned", "Project Assigned"
+        TASK_ASSIGNED = "task_assigned", "Task Assigned"
+        WORK_APPROVED = "work_approved", "Work Approved"
+        CHANGES_REQUESTED = "changes_requested", "Changes Requested"
+        INFO = "info", "Info"
+
+    user = models.ForeignKey(UserAccount, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    type = models.CharField(max_length=50, choices=Type.choices, default=Type.INFO)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "notifications"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.title}"

@@ -38,6 +38,17 @@ class Variation(BaseModel):
     # Client
     submitted_to_client = models.BooleanField(default=False)
     signed_by_client = models.BooleanField(default=False)
+    assigned_users = models.ManyToManyField(
+        UserAccount, related_name="assigned_variations", blank=True
+    )
+
+    # Monthly Application specific fields
+    valuation_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    percent_claimed = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    amount_claimed = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    client_certified_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    corresponding_notice_no = models.CharField(max_length=100, blank=True, default="")
+    client_qs_comment = models.TextField(blank=True, default="")
 
     date = models.DateField(auto_now_add=True)
 
@@ -54,6 +65,10 @@ class Variation(BaseModel):
 
     def __str__(self):
         return f"{self.vo_number} - {self.project.project_name}"
+
+    @property
+    def difference(self):
+        return self.amount_claimed - self.client_certified_amount
 
 
 class VariationLine(BaseModel):
@@ -77,3 +92,29 @@ class VariationLine(BaseModel):
 
     def __str__(self):
         return f"Line for {self.variation.vo_number}"
+
+
+class MonthlyApplication(BaseModel):
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="monthly_applications"
+    )
+    application_number = models.PositiveIntegerField()
+    date = models.DateField()
+    ref_no = models.CharField(max_length=100, blank=True, default="")
+    
+    retention_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=2.5)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
+    
+    # Financial snapshots
+    contract_works_total = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    variations_total = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    amount_claimed = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    client_certified_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+
+    class Meta:
+        db_table = "monthly_applications"
+        unique_together = ('project', 'application_number')
+        ordering = ["-application_number"]
+
+    def __str__(self):
+        return f"{self.project.project_name} - App {self.application_number}"

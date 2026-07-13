@@ -7,21 +7,43 @@ from .models import Variation, VariationLine
 from .serializers import VariationSerializer
 
 
+def check_project_access(user, project_id):
+    if not user.is_authenticated or not user.company:
+        return False
+    if user.role in ["admin", "project_admin"]:
+        from app.project_admin.models import Project
+        return Project.objects.filter(id=project_id, company=user.company).exists()
+    return user.assigned_projects.filter(id=project_id).exists()
+
+
 class VariationListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Return all variations the user has access to (filtered by their company's projects)."""
-        if not request.user.company:
+        """Return all variations the user has access to (filtered by their company's projects / assigned projects)."""
+        user = request.user
+        if not user.company:
             return Response({"variations": []})
 
-        variations = Variation.objects.filter(
-            project__company=request.user.company
-        ).select_related("project", "created_by", "approved_by").prefetch_related("lines")
+        if user.role in ["admin", "project_admin"]:
+            variations = Variation.objects.filter(
+                project__company=user.company
+            )
+        else:
+            variations = Variation.objects.filter(
+                project__in=user.assigned_projects.all()
+            )
+
+        variations = variations.select_related("project", "created_by", "approved_by").prefetch_related("lines")
 
         # Optional project filter
         project_id = request.query_params.get("project_id")
         if project_id:
+            if not check_project_access(user, project_id):
+                return Response(
+                    {"error": "Not authorized to access this project's variations."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
             variations = variations.filter(project_id=project_id)
 
         serializer = VariationSerializer(variations, many=True)
@@ -45,6 +67,13 @@ class VariationListCreateView(APIView):
             return Response(
                 {"error": "Please provide a description of works."},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check project access
+        if not check_project_access(request.user, project_id):
+            return Response(
+                {"error": "You do not have access to this project."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         import math
@@ -115,6 +144,13 @@ class VariationApprovalView(APIView):
         except Variation.DoesNotExist:
             return Response({"error": "Variation not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Check project access
+        if not check_project_access(request.user, variation.project_id):
+            return Response(
+                {"error": "You do not have access to this project's variations."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         if action == "approve":
             variation.approval_status = Variation.ApprovalStatus.APPROVED
             variation.approved_by = request.user
@@ -136,6 +172,115 @@ class VariationSubmitToClientView(APIView):
         except Variation.DoesNotExist:
             return Response({"error": "Variation not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Check project access
+        if not check_project_access(request.user, variation.project_id):
+            return Response(
+                {"error": "You do not have access to this project's variations."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         variation.submitted_to_client = True
         variation.save()
         return Response(VariationSerializer(variation).data)
+
+
+class VariationAssignUsersView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        """Assign users to a variation."""
+        try:
+            variation = Variation.objects.get(pk=pk)
+        except Variation.DoesNotExist:
+            return Response({"error": "Variation not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check project access
+        if not check_project_access(request.user, variation.project_id):
+            return Response(
+                {"error": "You do not have access to this project's variations."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        assigned_user_ids = request.data.get("assigned_user_ids", [])
+        if not isinstance(assigned_user_ids, list):
+            return Response({"error": "assigned_user_ids must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update assigned users
+        variation.assigned_users.set(assigned_user_ids)
+        variation.save()
+        return Response(VariationSerializer(variation).data)
+
+from .models import MonthlyApplication
+from .serializers import MonthlyApplicationSerializer
+from app.project_admin.models import ProjectFolder, ProjectSubfolder
+import datetime
+
+class MonthlyApplicationListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        project_id = request.query_params.get("project_id")
+        if not project_id:
+            return Response({"error": "project_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not check_project_access(request.user, project_id):
+            return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
+        
+        apps = MonthlyApplication.objects.filter(project_id=project_id)
+        serializer = MonthlyApplicationSerializer(apps, many=True)
+        return Response({"monthly_applications": serializer.data})
+
+    def post(self, request):
+        project_id = request.data.get("project_id")
+        if not project_id:
+            return Response({"error": "project_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not check_project_access(request.user, project_id):
+            return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Basic financial snapshot calculations
+        contract_works_total = sum(float(sub.project_value) for sub in ProjectSubfolder.objects.filter(folder__project_id=project_id))
+        
+        variations = Variation.objects.filter(project_id=project_id, approval_status="approved")
+        variations_total = sum(float(v.amount_claimed) for v in variations)
+        
+        count = MonthlyApplication.objects.filter(project_id=project_id).count()
+        app_number = count + 1
+
+        app = MonthlyApplication.objects.create(
+            project_id=project_id,
+            application_number=app_number,
+            date=datetime.date.today(),
+            contract_works_total=contract_works_total,
+            variations_total=variations_total,
+            retention_percentage=request.data.get("retention_percentage", 2.5),
+            discount_percentage=request.data.get("discount_percentage", 0.0),
+        )
+        serializer = MonthlyApplicationSerializer(app)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class WhiteCardView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        project_id = request.query_params.get("project_id")
+        if not project_id:
+            return Response({"error": "project_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not check_project_access(request.user, project_id):
+            return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
+
+        folders = ProjectFolder.objects.filter(project_id=project_id).prefetch_related("subfolders")
+        
+        groups = []
+        for folder in folders:
+            groups.append({
+                "groupId": folder.name.lower().replace(" ", "_"),
+                "headerName": folder.name,
+                "subfolders": [
+                    {
+                        "name": sub.name,
+                        "project_value": float(sub.project_value)
+                    } for sub in folder.subfolders.all()
+                ]
+            })
+
+        return Response({"groups": groups})

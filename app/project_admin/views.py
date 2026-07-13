@@ -6,7 +6,13 @@ from django.db import transaction
 
 from drf_spectacular.utils import extend_schema
 
-from app.account.permissions import IsAdmin, IsAdminOrProjectAdmin
+from app.account.permissions import (
+    IsAdmin, 
+    IsAdminOrProjectAdmin, 
+    CanManageProjectFolders, 
+    CanManageProjectRoles, 
+    IsAdminOrProjectAdminOrCompanyManager
+)
 from .models import Project
 from .serializers import (
     ProjectListSerializer,
@@ -270,15 +276,26 @@ class ProjectDetailView(APIView):
         )
 
 class CompanyUsersView(APIView):
-    permission_classes = [IsAdminOrProjectAdmin]
+    permission_classes = [IsAdminOrProjectAdminOrCompanyManager]
 
     def get(self, request):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
         
         from app.account.models import UserAccount
-        users = UserAccount.objects.filter(company=request.user.company).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
+        from django.db.models import Q
         
+        company = request.user.company
+        company_query = Q(company=company)
+        
+        if company.company_name:
+            company_query |= Q(company__company_name__iexact=company.company_name)
+        if company.company_number:
+            company_query |= Q(company__company_number=company.company_number)
+            
+        users = UserAccount.objects.filter(company_query).exclude(
+            role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN]
+        ).distinct()
         role_param = request.query_params.get("role")
         if role_param:
             users = users.filter(role=role_param)
@@ -299,7 +316,7 @@ class CompanyUsersView(APIView):
 
 
 class ProjectRoleAssignmentsView(APIView):
-    permission_classes = [IsAdminOrProjectAdmin]
+    permission_classes = [CanManageProjectRoles]
 
     def get(self, request, pk):
         if not request.user.company:
@@ -324,8 +341,10 @@ class ProjectRoleAssignmentsView(APIView):
                 
             role_assignments = assignments.filter(role=role_key)
             users_data = []
+            seen_users = set()
             for assignment in role_assignments:
-                if assignment.user:
+                if assignment.user and assignment.user.id not in seen_users:
+                    seen_users.add(assignment.user.id)
                     name = assignment.user.full_name
                     if not name:
                         name = assignment.user.email.split('@')[0]
@@ -359,9 +378,18 @@ class ProjectRoleAssignmentsView(APIView):
             return Response({"error": "role_key is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         from app.account.models import RoleAssignment, UserAccount
+        from django.db.models import Q
         
-        # Verify users exist and are in the company
-        users = UserAccount.objects.filter(id__in=user_ids, company=request.user.company)
+        # Verify users exist and are in the company (using the same logic as GET)
+        company = request.user.company
+        company_query = Q(company=company)
+        
+        if company.company_name:
+            company_query |= Q(company__company_name__iexact=company.company_name)
+        if company.company_number:
+            company_query |= Q(company__company_number=company.company_number)
+
+        users = UserAccount.objects.filter(company_query, id__in=user_ids).distinct()
         
         # Get existing assignments for this role
         old_assignments = RoleAssignment.objects.filter(role=role_key, project=project)
@@ -379,7 +407,16 @@ class ProjectRoleAssignmentsView(APIView):
                 company=request.user.company
             )
             # Add project to user's assigned projects list so they can see it
-            user.assigned_projects.add(project)
+            if not user.assigned_projects.filter(id=project.id).exists():
+                user.assigned_projects.add(project)
+                # Create a notification for the user
+                from app.account.models import Notification
+                Notification.objects.create(
+                    user=user,
+                    title="Project Assigned",
+                    body=f"You have been assigned to {project.project_name} as {role_key}.",
+                    type=Notification.Type.PROJECT_ASSIGNED
+                )
             
         # For any user removed from this role, if they have no other roles in the project,
         # remove the project from their assigned_projects
@@ -400,7 +437,7 @@ from .models import ProjectFolder, ProjectSubfolder
 from .serializers import ProjectFolderSerializer
 
 class ProjectFoldersView(APIView):
-    permission_classes = [IsAdminOrProjectAdmin]
+    permission_classes = [CanManageProjectFolders]
 
     def get(self, request, pk):
         if not request.user.company:
@@ -453,7 +490,7 @@ class ProjectFoldersView(APIView):
 
 
 class ProjectFoldersBulkUpdateView(APIView):
-    permission_classes = [IsAdminOrProjectAdmin]
+    permission_classes = [CanManageProjectFolders]
 
     def put(self, request, pk):
         if not request.user.company:
@@ -613,6 +650,7 @@ class ProjectApprovalConfigurationsView(APIView):
                     action_type=action_type,
                     condition_value=c_data.get("condition_value", "ALL"),
                     required_roles=c_data.get("required_roles", ""),
+                    toggle_states=c_data.get("toggle_states", []),
                     is_active=c_data.get("is_active", True)
                 )
 
@@ -684,3 +722,155 @@ class RFIMessageCreateView(APIView):
                 
         serializer = RFIMessageSerializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+from .models import ProformaAccess
+from .serializers import ProformaAccessSerializer
+
+class ProformaAccessListView(APIView):
+    permission_classes = [CanManageProjectRoles]
+
+    def get(self, request, pk):
+        if not request.user.company:
+            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            project = Project.objects.get(pk=pk, company=request.user.company)
+        except Project.DoesNotExist:
+            return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        accesses = ProformaAccess.objects.filter(project=project)
+        serializer = ProformaAccessSerializer(accesses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, pk):
+        if not request.user.company:
+            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            project = Project.objects.get(pk=pk, company=request.user.company)
+        except Project.DoesNotExist:
+            return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user_ids = request.data.get('user_ids', [])
+        if not isinstance(user_ids, list):
+            return Response({"error": "user_ids must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_count = 0
+        from app.account.models import UserAccount
+        for u_id in user_ids:
+            try:
+                u = UserAccount.objects.get(id=u_id, company=request.user.company)
+                _, created = ProformaAccess.objects.get_or_create(project=project, user=u)
+                if created:
+                    created_count += 1
+            except UserAccount.DoesNotExist:
+                continue
+
+        accesses = ProformaAccess.objects.filter(project=project)
+        serializer = ProformaAccessSerializer(accesses, many=True)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ProformaAccessDetailView(APIView):
+    permission_classes = [CanManageProjectRoles]
+
+    def patch(self, request, pk, access_pk):
+        if not request.user.company:
+            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            access = ProformaAccess.objects.get(pk=access_pk, project__id=pk, project__company=request.user.company)
+        except ProformaAccess.DoesNotExist:
+            return Response({"error": "Access not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        is_active = request.data.get('is_active')
+        if is_active is not None:
+            access.is_active = bool(is_active)
+            access.save()
+
+        serializer = ProformaAccessSerializer(access)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk, access_pk):
+        if not request.user.company:
+            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            access = ProformaAccess.objects.get(pk=access_pk, project__id=pk, project__company=request.user.company)
+            access.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ProformaAccess.DoesNotExist:
+            return Response({"error": "Access not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+from .models import LoadingClearingAccess
+from .serializers import LoadingClearingAccessSerializer
+
+class LoadingClearingAccessListView(APIView):
+    permission_classes = [CanManageProjectRoles]
+
+    def get(self, request, pk):
+        if not request.user.company:
+            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            project = Project.objects.get(pk=pk, company=request.user.company)
+        except Project.DoesNotExist:
+            return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        accesses = LoadingClearingAccess.objects.filter(project=project)
+        serializer = LoadingClearingAccessSerializer(accesses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, pk):
+        if not request.user.company:
+            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            project = Project.objects.get(pk=pk, company=request.user.company)
+        except Project.DoesNotExist:
+            return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user_ids = request.data.get('user_ids', [])
+        if not isinstance(user_ids, list):
+            return Response({"error": "user_ids must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_count = 0
+        from app.account.models import UserAccount
+        for u_id in user_ids:
+            try:
+                u = UserAccount.objects.get(id=u_id, company=request.user.company)
+                _, created = LoadingClearingAccess.objects.get_or_create(project=project, user=u)
+                if created:
+                    created_count += 1
+            except UserAccount.DoesNotExist:
+                continue
+
+        accesses = LoadingClearingAccess.objects.filter(project=project)
+        serializer = LoadingClearingAccessSerializer(accesses, many=True)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class LoadingClearingAccessDetailView(APIView):
+    permission_classes = [CanManageProjectRoles]
+
+    def patch(self, request, pk, access_pk):
+        if not request.user.company:
+            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            access = LoadingClearingAccess.objects.get(pk=access_pk, project__id=pk, project__company=request.user.company)
+        except LoadingClearingAccess.DoesNotExist:
+            return Response({"error": "Access not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        is_active = request.data.get('is_active')
+        if is_active is not None:
+            access.is_active = bool(is_active)
+            access.save()
+
+        serializer = LoadingClearingAccessSerializer(access)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk, access_pk):
+        if not request.user.company:
+            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            access = LoadingClearingAccess.objects.get(pk=access_pk, project__id=pk, project__company=request.user.company)
+            access.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except LoadingClearingAccess.DoesNotExist:
+            return Response({"error": "Access not found."}, status=status.HTTP_404_NOT_FOUND)

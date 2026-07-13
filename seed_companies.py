@@ -12,7 +12,7 @@ companies_data = [
         "company_name": "Acme Corp",
         "monthly_subscription": Decimal("500.00"),
         "per_user_rate": Decimal("25.00"),
-        "auto_monthly_inv": True,
+        "auto_monthly_inv": False,
         "user": 10,
     },
     {
@@ -26,7 +26,7 @@ companies_data = [
         "company_name": "Soylent Corp",
         "monthly_subscription": Decimal("1000.00"),
         "per_user_rate": Decimal("20.00"),
-        "auto_monthly_inv": True,
+        "auto_monthly_inv": False,
         "user": 50,
     },
     {
@@ -40,7 +40,7 @@ companies_data = [
         "company_name": "Umbrella Corp",
         "monthly_subscription": Decimal("2000.00"),
         "per_user_rate": Decimal("50.00"),
-        "auto_monthly_inv": True,
+        "auto_monthly_inv": False,
         "user": 100,
     }
 ]
