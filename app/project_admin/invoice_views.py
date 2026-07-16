@@ -19,7 +19,7 @@ from app.project_admin.models import UserInvoice
 
 ROLE_TO_APPROVAL_FIELD = {
     "supervisor": "supervisor_approved",
-    "managers": "supervisor_approved",       # managers act as supervisor
+    "manager": "manager_approved",
     "contracts_manager": "contracts_manager_approved",
     "project_director": "project_director_approved",
     "managing_director": "managing_director_approved",
@@ -27,7 +27,7 @@ ROLE_TO_APPROVAL_FIELD = {
 
 ROLE_TO_DATE_FIELD = {
     "supervisor": "supervisor_approved_date",
-    "managers": "supervisor_approved_date",
+    "manager": "manager_approved_date",
     "contracts_manager": "contracts_manager_approved_date",
     "project_director": "project_director_approved_date",
     "managing_director": "managing_director_approved_date",
@@ -35,7 +35,7 @@ ROLE_TO_DATE_FIELD = {
 
 ROLE_TO_BY_FIELD = {
     "supervisor": "supervisor_approved_by",
-    "managers": "supervisor_approved_by",
+    "manager": "manager_approved_by",
     "contracts_manager": "contracts_manager_approved_by",
     "project_director": "project_director_approved_by",
     "managing_director": "managing_director_approved_by",
@@ -64,6 +64,8 @@ def _serialize_invoice(inv: UserInvoice) -> dict:
         # Approval chain
         "supervisorApproved": inv.supervisor_approved,
         "supervisorApprovedDate": inv.supervisor_approved_date.strftime("%d/%m/%Y") if inv.supervisor_approved_date else "",
+        "managerApproved": inv.manager_approved,
+        "managerApprovedDate": inv.manager_approved_date.strftime("%d/%m/%Y") if inv.manager_approved_date else "",
         "contractsManagerApproved": inv.contracts_manager_approved,
         "contractsManagerApprovedDate": inv.contracts_manager_approved_date.strftime("%d/%m/%Y") if inv.contracts_manager_approved_date else "",
         "projectDirectorApproved": inv.project_director_approved,
@@ -103,9 +105,9 @@ class UserInvoiceListView(APIView):
 
         from django.db.models import Q
         if company:
-            qs = UserInvoice.objects.filter(Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.assigned_projects.all()))
+            qs = UserInvoice.objects.filter(status=UserInvoice.Status.SUBMITTED).filter(Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.assigned_projects.all()))
         else:
-            qs = UserInvoice.objects.filter(project__in=user.assigned_projects.all())
+            qs = UserInvoice.objects.filter(status=UserInvoice.Status.SUBMITTED, project__in=user.assigned_projects.all())
 
         qs = qs.select_related("project", "created_by", "managing_director_approved_by", "finance_paid_by")
 
@@ -142,6 +144,10 @@ class UserInvoiceApproveView(APIView):
     def post(self, request, invoice_id):
         user = request.user
         role = user.role
+        
+        # UI sends "managers" sometimes, we map it back to "manager" in backend for role logic.
+        if role == "managers":
+            role = "manager"
 
         if role not in ROLE_TO_APPROVAL_FIELD:
             return Response(
@@ -258,3 +264,46 @@ class UserInvoiceCommercialCommentView(APIView):
             invoice.save()
 
         return Response({"invoice": _serialize_invoice(invoice)})
+
+
+class BucketListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        qs = UserInvoice.objects.filter(status=UserInvoice.Status.BUCKET, created_by=user)
+        qs = qs.select_related("project", "created_by")
+        
+        project_id = request.query_params.get("project_id")
+        if project_id and project_id != "all":
+            qs = qs.filter(project_id=project_id)
+            
+        invoices = [_serialize_invoice(inv) for inv in qs]
+        return Response({
+            "invoices": invoices,
+            "total_count": len(invoices)
+        })
+
+class BucketSubmitView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        invoice_ids = request.data.get("invoice_ids", [])
+        
+        if not isinstance(invoice_ids, list):
+            return Response({"error": "invoice_ids must be a list"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        invoices = UserInvoice.objects.filter(
+            id__in=invoice_ids, 
+            status=UserInvoice.Status.BUCKET,
+            created_by=user
+        )
+        
+        submitted_count = 0
+        for inv in invoices:
+            inv.status = UserInvoice.Status.SUBMITTED
+            inv.save()
+            submitted_count += 1
+            
+        return Response({"message": f"Successfully submitted {submitted_count} items."})

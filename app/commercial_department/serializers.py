@@ -60,7 +60,7 @@ class VariationSerializer(serializers.ModelSerializer):
             "created_by", "created_by_name",
             "lines",
             "assigned_user_ids",
-            "no", "siteInstructionNumber", "evidence", "variationSheetNumber", "descriptionOfWorks",
+            "no", "siteInstructionNumber", "evidence", "evidence_url", "variationSheetNumber", "descriptionOfWorks",
             "workArea", "workSection", "labourCost", "materialCost", "variationAmount",
             "percentClaimed", "amountClaimed", "addToApplication", "signByClient",
             "clientCertifiedAmount", "diffrenceAmount", "paymentStatusNr", "claimGQComment",
@@ -79,7 +79,7 @@ class VariationSerializer(serializers.ModelSerializer):
         return ""
 
     def get_evidence(self, obj):
-        return "📄"
+        return obj.evidence_url if obj.evidence_url else "📄"
 
     def get_workArea(self, obj):
         return ", ".join(filter(None, set(line.work_area for line in obj.lines.all())))

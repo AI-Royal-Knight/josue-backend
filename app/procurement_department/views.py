@@ -155,11 +155,108 @@ class QuotationViewSet(viewsets.ModelViewSet):
             role=UserAccount.Role.PROCUREMENT_DEPARTMENT
         ).first()
         
+        queryset = Quotation.objects.none()
         if role_assignment and role_assignment.company:
-            return Quotation.objects.filter(project__company=role_assignment.company)
+            queryset = Quotation.objects.filter(project__company=role_assignment.company)
             
-        # For all other users, only return quotations for projects this user is assigned to
-        return Quotation.objects.filter(project__in=self.request.user.assigned_projects.all())
+        # Always include quotations for projects this user is explicitly assigned to
+        assigned_qs = Quotation.objects.filter(project__in=self.request.user.assigned_projects.all())
+        
+        return (queryset | assigned_qs).distinct()
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()
+        
+        # Auto-create or resolve supplier if we receive raw names instead of ID
+        if 'supplier' not in data and 'supplier_name' in data:
+            supplier_name = data.get('supplier_name')
+            supplier_email = data.get('supplier_email') or f"temp_supplier_{supplier_name.replace(' ', '_').lower()}@example.com"
+            
+            # Find user's company
+            company = None
+            if request.user.role == UserAccount.Role.ADMIN:
+                company = request.user.admin_profile.company
+            else:
+                from app.account.models import RoleAssignment
+                role_assignment = RoleAssignment.objects.filter(user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT).first()
+                if role_assignment:
+                    company = role_assignment.company
+                    
+            if company:
+                user, _ = UserAccount.objects.get_or_create(
+                    email=supplier_email,
+                    defaults={'role': UserAccount.Role.SUPPLIER, 'is_active': True}
+                )
+                from app.account.models import SupplierProfile, CompanySupplier
+                supplier_profile, _ = SupplierProfile.objects.get_or_create(
+                    user=user,
+                    defaults={'company_name': supplier_name}
+                )
+                company_supplier, _ = CompanySupplier.objects.get_or_create(
+                    company=company,
+                    supplier=supplier_profile,
+                    defaults={'eom_payment_terms': 30, 'credit_limit': 0.00}
+                )
+                data['supplier'] = company_supplier.id
+                
+        # We need to temporarily set the modified data for the serializer
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class ParsePOPDFView(APIView):
+    """POST /procurement/po/parse-pdf/  → parse a supplier PDF and return structured data."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return Response({"error": "No file uploaded."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not uploaded.name.lower().endswith(".pdf"):
+            return Response({"error": "Only PDF files are supported."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from .pdf_utils import parse_po_pdf
+            parsed = parse_po_pdf(uploaded)
+            return Response(parsed, status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GenerateBrandedPOPDFView(APIView):
+    """POST /procurement/po/generate-pdf/  → create a branded PDF and return it as a download."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        import json
+        from django.http import HttpResponse
+
+        try:
+            parsed_data = request.data  # DRF parses JSON body
+            if not isinstance(parsed_data, dict):
+                return Response({"error": "Expected JSON body."}, status=status.HTTP_400_BAD_REQUEST)
+
+            logo_path = None
+            # Try to locate a logo relative to the Django project
+            import os
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            candidate = os.path.join(base_dir, "app", "static", "logo.png")
+            if os.path.exists(candidate):
+                logo_path = candidate
+
+            from .pdf_utils import generate_branded_po_pdf
+            pdf_bytes = generate_branded_po_pdf(parsed_data, logo_path=logo_path)
+
+            response = HttpResponse(pdf_bytes, content_type="application/pdf")
+            ref = parsed_data.get("quotation_number", "PO")
+            response["Content-Disposition"] = f'attachment; filename="PO_{ref}.pdf"'
+            return response
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

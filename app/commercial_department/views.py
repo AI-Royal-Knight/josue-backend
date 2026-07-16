@@ -5,6 +5,8 @@ from django.db import transaction
 
 from .models import Variation, VariationLine
 from .serializers import VariationSerializer
+import json
+import cloudinary.uploader
 
 
 def check_project_access(user, project_id):
@@ -56,7 +58,18 @@ class VariationListCreateView(APIView):
         site_instruction_no = request.data.get("site_instruction_no", "")
         attention_of = request.data.get("attention_of", "")
         comments = request.data.get("comments", "")
-        lines_data = request.data.get("lines", [])
+        lines_data_raw = request.data.get("lines", [])
+        
+        lines_data = []
+        if isinstance(lines_data_raw, str):
+            try:
+                lines_data = json.loads(lines_data_raw)
+            except json.JSONDecodeError:
+                lines_data = []
+        else:
+            lines_data = lines_data_raw
+            
+        evidence_file = request.FILES.get("evidence")
 
         if not project_id:
             return Response(
@@ -97,6 +110,18 @@ class VariationListCreateView(APIView):
         # Determine variation sheet number (A, B, C... based on count for this project)
         count = Variation.objects.filter(project_id=project_id).count()
         sheet_letter = chr(65 + count) if count < 26 else str(count + 1)
+        
+        evidence_url = ""
+        if evidence_file:
+            try:
+                upload_result = cloudinary.uploader.upload(
+                    evidence_file,
+                    resource_type='auto',
+                    folder=f"josue_variations/{project_id}"
+                )
+                evidence_url = upload_result.get('secure_url')
+            except Exception as e:
+                return Response({"error": f"Failed to upload evidence: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             variation = Variation.objects.create(
@@ -106,6 +131,7 @@ class VariationListCreateView(APIView):
                 attention_of=attention_of,
                 description_of_works=description,
                 comments=comments,
+                evidence_url=evidence_url,
                 total_amount=total_amount,
                 variation_sheet_number=sheet_letter,
             )

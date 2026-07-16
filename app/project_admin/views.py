@@ -650,6 +650,7 @@ class ProjectApprovalConfigurationsView(APIView):
                     action_type=action_type,
                     condition_value=c_data.get("condition_value", "ALL"),
                     required_roles=c_data.get("required_roles", ""),
+                    role_thresholds=c_data.get("role_thresholds", {}),
                     toggle_states=c_data.get("toggle_states", []),
                     is_active=c_data.get("is_active", True)
                 )

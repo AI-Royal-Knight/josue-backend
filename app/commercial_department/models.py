@@ -24,6 +24,7 @@ class Variation(BaseModel):
     attention_of = models.CharField(max_length=200, blank=True, default="")
     description_of_works = models.TextField(blank=True, default="")
     comments = models.TextField(blank=True, default="")
+    evidence_url = models.URLField(max_length=500, blank=True, default="")
 
     total_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
 

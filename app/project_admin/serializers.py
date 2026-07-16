@@ -105,7 +105,7 @@ from .models import ApprovalConfiguration
 class ApprovalConfigurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApprovalConfiguration
-        fields = ['id', 'action_type', 'condition_value', 'required_roles', 'toggle_states', 'is_active']
+        fields = ['id', 'action_type', 'condition_value', 'required_roles', 'role_thresholds', 'toggle_states', 'is_active']
 
 
 from .models import ProformaAccess

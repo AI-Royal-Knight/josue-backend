@@ -7,6 +7,7 @@ from .views import (
     CheckInView,
     CheckOutView,
     MyFoldersView,
+    MyFolderSubfoldersView,
     RFIListView,
     RFICreateView,
     DailyRegister,
@@ -18,8 +19,11 @@ from .views import (
     OperationCompleteView,
     LoadingClearingSubmitView,
     VariationSubmitView,
+    EmployeeVariationsListView,
     CompanyEmployeeListView,
     SubmitLabourTargetView,
+    ProformaNRSubmitView,
+    EmployeeHistoryView,
 )
 
 app_name = 'employee'
@@ -32,6 +36,7 @@ urlpatterns = [
     path('attendance/check-in/', CheckInView.as_view(), name='check-in'),
     path('attendance/check-out/', CheckOutView.as_view(), name='check-out'),
     path('my-folders/', MyFoldersView.as_view(), name='my-folders'),
+    path('my-folders/<uuid:folder_id>/subfolders/', MyFolderSubfoldersView.as_view(), name='my-folder-subfolders'),
     path('labour-target/submit/<uuid:assignment_id>/', SubmitLabourTargetView.as_view(), name='submit-labour-target'),
     path('rfis/', RFIListView.as_view(), name='rfi-list'),
     path('rfis/create/', RFICreateView.as_view(), name='rfi-create'),
@@ -44,5 +49,8 @@ urlpatterns = [
     path('operations/<str:op_type>/<int:op_id>/complete/', OperationCompleteView.as_view(), name='operation-complete'),
     path('loading-clearing/submit/', LoadingClearingSubmitView.as_view(), name='loading_clearing_submit'),
     path('variations/submit/', VariationSubmitView.as_view(), name='variation_submit'),
+    path('proforma-nr/submit/', ProformaNRSubmitView.as_view(), name='proforma_nr_submit'),
+    path('variations/', EmployeeVariationsListView.as_view(), name='variations-list'),
     path('company-employees/', CompanyEmployeeListView.as_view(), name='company-employees'),
+    path('history/', EmployeeHistoryView.as_view(), name='history'),
 ]

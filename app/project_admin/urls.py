@@ -22,6 +22,8 @@ from .invoice_views import (
     UserInvoiceApproveView,
     UserInvoicePayView,
     UserInvoiceCommercialCommentView,
+    BucketListView,
+    BucketSubmitView,
 )
 
 urlpatterns = [
@@ -46,4 +48,6 @@ urlpatterns = [
     path("user-invoices/<uuid:invoice_id>/approve/", UserInvoiceApproveView.as_view(), name="user-invoice-approve"),
     path("user-invoices/<uuid:invoice_id>/pay/", UserInvoicePayView.as_view(), name="user-invoice-pay"),
     path("user-invoices/<uuid:invoice_id>/commercial-comment/", UserInvoiceCommercialCommentView.as_view(), name="user-invoice-commercial-comment"),
+    path("bucket/", BucketListView.as_view(), name="bucket-list"),
+    path("bucket/submit/", BucketSubmitView.as_view(), name="bucket-submit"),
 ]

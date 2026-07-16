@@ -140,6 +140,7 @@ class ApprovalConfiguration(BaseModel):
         PURCHASE_ORDER = "purchase_order", "Purchase Orders"
         PROFORMA = "proforma", "Proforma Nr Invoices"
         USER_VARIATIONS_INVOICE = "user_variations_invoice", "User Variations Invoices"
+        USER_CLOCK_IN = "user_clock_in", "User Clock in"
         
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="approval_configs")
     action_type = models.CharField(max_length=50, choices=ActionType.choices)
@@ -148,9 +149,12 @@ class ApprovalConfiguration(BaseModel):
     condition_value = models.CharField(max_length=50, default="ALL")
     
     # Store roles that need to sign. e.g. "supervisor,contracts_manager" (comma separated)
-    required_roles = models.CharField(max_length=255)
+    required_roles = models.CharField(max_length=255, blank=True, default="")
     
-    toggle_states = models.JSONField(default=list)
+    # Store specific budget thresholds for each role. e.g. {"manager": 500}
+    role_thresholds = models.JSONField(default=dict, blank=True)
+    
+    toggle_states = models.JSONField(default=list, blank=True)
     
     is_active = models.BooleanField(default=True)
 
@@ -259,6 +263,14 @@ class UserInvoice(BaseModel):
         PROFORMA = "proforma", "Proforma NR"
         LOADING_CLEARING = "loading_clearing", "Loading & Clearing"
 
+    class Status(models.TextChoices):
+        BUCKET = "bucket", "Bucket"
+        SUBMITTED = "submitted", "Submitted"
+
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.SUBMITTED
+    )
+
     project = models.ForeignKey(
         Project, on_delete=models.CASCADE, related_name="user_invoices"
     )
@@ -289,6 +301,16 @@ class UserInvoice(BaseModel):
         null=True,
         blank=True,
         related_name="supervisor_approved_invoices",
+    )
+
+    manager_approved = models.BooleanField(default=False)
+    manager_approved_date = models.DateField(null=True, blank=True)
+    manager_approved_by = models.ForeignKey(
+        "account.UserAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="manager_approved_invoices",
     )
 
     contracts_manager_approved = models.BooleanField(default=False)
@@ -339,23 +361,74 @@ class UserInvoice(BaseModel):
         ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
-        if not self.invoice_number:
+        if self.status == self.Status.SUBMITTED and (not self.invoice_number or self.invoice_number.startswith("BKT-")):
             import datetime
             year = datetime.date.today().year
             count = UserInvoice.objects.filter(
-                date__year=year
+                date__year=year,
+                status=self.Status.SUBMITTED
             ).count() + 1
             self.invoice_number = f"INV-{year}-{str(count).zfill(4)}"
+        elif self.status == self.Status.BUCKET and not self.invoice_number:
+            import uuid
+            self.invoice_number = f"BKT-{uuid.uuid4().hex[:8].upper()}"
         super().save(*args, **kwargs)
 
     @property
     def fully_approved(self):
-        return (
-            self.supervisor_approved
-            and self.contracts_manager_approved
-            and self.project_director_approved
-            and self.managing_director_approved
-        )
+        # Determine the action_type for config lookup
+        source_to_action = {
+            self.SourceType.LABOUR_TARGET: "user_invoice",
+            self.SourceType.LOADING_CLEARING: "user_invoice",
+            self.SourceType.VARIATION: "user_variations_invoice",
+            self.SourceType.PROFORMA: "proforma",
+        }
+        action_type = source_to_action.get(self.source_type, "user_invoice")
+
+        try:
+            from app.project_admin.models import ApprovalConfiguration
+            config = ApprovalConfiguration.objects.get(
+                project=self.project,
+                action_type=action_type,
+                is_active=True
+            )
+            roles = [r.strip() for r in config.required_roles.split(',')] if config.required_roles else []
+            thresholds = config.role_thresholds or {}
+
+            # Helper to check if a role is required based on its threshold
+            def is_required(role_key):
+                if role_key not in roles:
+                    return False
+                threshold = thresholds.get(role_key, 1)
+                if threshold is None:
+                    threshold = 1
+                try:
+                    return float(self.total) > float(threshold)
+                except (ValueError, TypeError):
+                    return True
+
+            if is_required("supervisor") and not self.supervisor_approved:
+                return False
+            if is_required("manager") and not self.manager_approved:
+                return False
+            if is_required("contracts_manager") and not self.contracts_manager_approved:
+                return False
+            if is_required("project_director") and not self.project_director_approved:
+                return False
+            if is_required("managing_director") and not self.managing_director_approved:
+                return False
+        except Exception:
+            # If no config or error, default to requiring supervisor + all others to be safe
+            if not self.supervisor_approved:
+                return False
+            return (
+                self.manager_approved
+                and self.contracts_manager_approved
+                and self.project_director_approved
+                and self.managing_director_approved
+            )
+
+        return True
 
     def __str__(self):
         return f"{self.invoice_number} - {self.project.project_name}"

@@ -559,6 +559,7 @@ class UsersListView(APIView):
                 "surname": u.last_name,
                 "email": u.email,
                 "phone": company.phone if company else "",
+                "role": u.role,
                 "profession": dict(UserAccount.Role.choices).get(u.role, u.role),
                 "cscsCardNo": profile.cscs_card_no if profile else "",
                 "cscsExpiryDate": str(profile.cscs_expiry_date) if profile and profile.cscs_expiry_date else "",

@@ -74,7 +74,7 @@ class EmployeeAssignProjectView(APIView):
 
 from django.utils import timezone
 from .models import AttendanceLog
-from app.project_admin.models import VariationsAccess
+from app.project_admin.models import VariationsAccess, LoadingClearingAccess, LoadingClearingBooking
 from app.commercial_department.models import Variation
 
 class AttendanceStatusView(APIView):
@@ -236,9 +236,48 @@ class MyFoldersView(APIView):
                     "id": folder_id,
                     "name": folder.name,
                     "is_management": folder.is_management,
-                    "subfolders": []
                 }
 
+        return Response({"folders": list(folder_map.values())}, status=status.HTTP_200_OK)
+
+
+class MyFolderSubfoldersView(APIView):
+    """
+    Returns all assigned subfolders for a specific project folder
+    for the current employee on their active project.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, folder_id):
+        if request.user.role != 'employee':
+            return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
+
+        today = timezone.now().date()
+        active_log = AttendanceLog.objects.filter(
+            user=request.user,
+            date=today,
+            status='checked_in'
+        ).select_related('project').first()
+
+        if not active_log:
+            return Response({"subfolders": []}, status=status.HTTP_200_OK)
+
+        project = active_log.project
+
+        from app.project_admin.models import FolderAssignment
+        assignments = FolderAssignment.objects.filter(
+            user=request.user,
+            subfolder__folder__id=folder_id,
+            subfolder__folder__project=project
+        ).select_related('subfolder', 'subfolder__folder')
+
+        if not assignments.exists():
+            return Response({"subfolders": []}, status=status.HTTP_200_OK)
+
+        subfolders_data = []
+        for assignment in assignments:
+            subfolder = assignment.subfolder
+            
             calculated_labour_target = 0
             if subfolder.rows:
                 for row in subfolder.rows:
@@ -250,7 +289,7 @@ class MyFoldersView(APIView):
             if calculated_labour_target == 0 and subfolder.labour_target:
                 calculated_labour_target = float(subfolder.labour_target)
 
-            folder_map[folder_id]["subfolders"].append({
+            subfolders_data.append({
                 "id": str(subfolder.id),
                 "name": subfolder.name,
                 "project_value": str(subfolder.project_value),
@@ -261,7 +300,7 @@ class MyFoldersView(APIView):
                 "employee_labour_value": str(assignment.employee_labour_value) if assignment.employee_labour_value is not None else None,
             })
 
-        return Response({"folders": list(folder_map.values())}, status=status.HTTP_200_OK)
+        return Response({"subfolders": subfolders_data}, status=status.HTTP_200_OK)
 
 
 class SubmitLabourTargetView(APIView):
@@ -280,9 +319,6 @@ class SubmitLabourTargetView(APIView):
             assignment = FolderAssignment.objects.get(id=assignment_id, user=request.user)
         except FolderAssignment.DoesNotExist:
             return Response({"error": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if not assignment.hide_labour_target:
-            return Response({"error": "Cannot submit value because labour target is not hidden."}, status=status.HTTP_400_BAD_REQUEST)
 
         value = request.data.get('employee_labour_value')
         if value is None:
@@ -303,9 +339,13 @@ class SubmitLabourTargetView(APIView):
                     work_area=assignment.subfolder.name,
                     description=f"Labour Target – {assignment.subfolder.name}",
                     total=float(value),
+                    status=UserInvoice.Status.BUCKET,
                 )
-            except Exception:
-                pass  # Don't fail the main response if invoice creation fails
+            except Exception as e:
+                import traceback
+                with open("/tmp/invoice_error.log", "a") as f:
+                    f.write(f"Labour Target Error: {str(e)}\n")
+                    f.write(traceback.format_exc() + "\n")
 
             return Response({"message": "Labour target submitted successfully."}, status=status.HTTP_200_OK)
         except ValueError:
@@ -634,6 +674,7 @@ class ToDoCreateView(APIView):
             assign_user=assign_user
         )
         return Response(ToDoListSerializer(todo).data, status=status.HTTP_201_CREATED)
+
 class CompanyEmployeeListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -732,18 +773,90 @@ class LoadingClearingSubmitView(APIView):
                 source_id=str(booking.id),
                 description=description or "Loading & Clearing submission",
                 total=amount,
+                status=UserInvoice.Status.BUCKET,
             )
-        except Exception:
-            pass  # Don't fail the main response if invoice creation fails
+        except Exception as e:
+            import traceback
+            with open("/tmp/invoice_error.log", "a") as f:
+                f.write(f"Loading Clearing Error: {str(e)}\n")
+                f.write(traceback.format_exc() + "\n")  # Don't fail the main response if invoice creation fails
 
         return Response({
             "message": "Loading and clearing submitted successfully.",
             "booking_id": booking.id
         }, status=status.HTTP_201_CREATED)
 
+class EmployeeVariationsListView(APIView):
+    """
+    Get a list of Variations assigned to the employee for their active project.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'employee':
+            return Response({"error": "Only employees can view assigned variations"}, status=status.HTTP_403_FORBIDDEN)
+
+        today = timezone.localtime().date()
+        try:
+            attendance = AttendanceLog.objects.filter(
+                user=request.user,
+                date=today,
+                check_in_time__isnull=False,
+                check_out_time__isnull=True
+            ).latest('check_in_time')
+            active_project = attendance.project
+        except AttendanceLog.DoesNotExist:
+            return Response({"error": "You must be checked into a project."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from app.commercial_department.models import Variation
+        from app.project_admin.models import UserInvoice
+        
+        # Get variations assigned to this user in this project
+        variations = Variation.objects.filter(
+            project=active_project,
+            assigned_users=request.user
+        ).prefetch_related('lines')
+
+        # Pre-fetch the set of submitted variation IDs for this user
+        submitted_variation_ids = set(
+            UserInvoice.objects.filter(
+                created_by=request.user,
+                source_type=UserInvoice.SourceType.VARIATION
+            ).values_list('source_id', flat=True)
+        )
+
+        data = []
+        for v in variations:
+            lines_data = []
+            for line in v.lines.all():
+                lines_data.append({
+                    "id": str(line.id),
+                    "work_area": line.work_area,
+                    "work_section": line.work_section,
+                    "labour": str(line.labour),
+                    "qty": str(line.qty),
+                    "line_total": str(line.line_total)
+                })
+            
+            data.append({
+                "id": str(v.id),
+                "vo_number": v.vo_number,
+                "project_name": v.project.project_name,
+                "site_instruction_no": v.site_instruction_no,
+                "attention_of": v.attention_of,
+                "description_of_works": v.description_of_works,
+                "comments": v.comments,
+                "evidence_url": v.evidence_url,
+                "total_amount": str(v.total_amount),
+                "lines": lines_data,
+                "is_submitted": str(v.id) in submitted_variation_ids
+            })
+            
+        return Response({"variations": data}, status=status.HTTP_200_OK)
+
 class VariationSubmitView(APIView):
     """
-    Submit a Variation booking.
+    Submit an existing assigned Variation to the Bucket List.
     The employee must be checked into a project.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -772,37 +885,21 @@ class VariationSubmitView(APIView):
             is_active=True
         ).exists()
 
+        if not has_access:
+            return Response({"error": "You do not have Variations access for this project."}, status=status.HTTP_403_FORBIDDEN)
+
         # 3. Extract data
-        data = request.data
-        description = data.get("description", "")
-        comments = data.get("comments", "")
-        
-        labour_target = Decimal('0')
-        if has_access:
-            try:
-                labour_target_val = data.get("labour_target", 0)
-                if labour_target_val:
-                    labour_target = Decimal(str(labour_target_val))
-            except (ValueError, TypeError, InvalidOperation):
-                pass
+        variation_id = request.data.get("variation_id")
+        if not variation_id:
+            return Response({"error": "variation_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 4. Create the variation
-        from app.commercial_department.models import Variation, VariationLine
-        
-        variation = Variation.objects.create(
-            project=active_project,
-            created_by=request.user,
-            description_of_works=description,
-            comments=comments
-        )
-        
-        if labour_target > 0:
-            VariationLine.objects.create(
-                variation=variation,
-                labour_target=labour_target
-            )
+        from app.commercial_department.models import Variation
+        try:
+            variation = Variation.objects.get(id=variation_id, project=active_project, assigned_users=request.user)
+        except Variation.DoesNotExist:
+            return Response({"error": "Variation not found or not assigned to you."}, status=status.HTTP_404_NOT_FOUND)
 
-        # 5. Auto-generate a UserInvoice
+        # 4. Auto-generate a UserInvoice (Bucket list item)
         try:
             from app.project_admin.models import UserInvoice
             UserInvoice.objects.create(
@@ -811,13 +908,111 @@ class VariationSubmitView(APIView):
                 source_type=UserInvoice.SourceType.VARIATION,
                 source_id=str(variation.id),
                 variation_sheet_no=variation.vo_number,
-                description=description or "Variation submission",
+                description=variation.description_of_works or f"Variation {variation.vo_number}",
                 total=variation.total_amount,
+                status=UserInvoice.Status.BUCKET,
             )
-        except Exception:
-            pass  # Don't fail the main response if invoice creation fails
+        except Exception as e:
+            import traceback
+            with open("/tmp/invoice_error.log", "a") as f:
+                f.write(f"Variation Error: {str(e)}\n")
+                f.write(traceback.format_exc() + "\n")  # Don't fail the main response if invoice creation fails
 
         return Response({
-            "message": "Variation submitted successfully.",
-            "variation_id": variation.id
+            "message": "Variation submitted to Bucket List successfully.",
+            "variation_id": str(variation.id)
         }, status=status.HTTP_201_CREATED)
+
+class ProformaNRSubmitView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'employee':
+            return Response({"error": "Only employees can submit Proforma NR."}, status=status.HTTP_403_FORBIDDEN)
+
+        # 1. Get the employee's active project from AttendanceLog
+        today = timezone.localtime().date()
+        try:
+            attendance = AttendanceLog.objects.filter(
+                user=request.user,
+                date=today,
+                check_in_time__isnull=False,
+                check_out_time__isnull=True
+            ).latest('check_in_time')
+            active_project = attendance.project
+        except AttendanceLog.DoesNotExist:
+            return Response({"error": "You must be checked into a project to submit proforma NR."}, status=status.HTTP_400_BAD_REQUEST)
+
+        description = request.data.get("description", "")
+        amount_str = request.data.get("amount", "0")
+
+        try:
+            amount = Decimal(str(amount_str))
+        except (ValueError, TypeError, InvalidOperation):
+            return Response({"error": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from app.finance_department.models import ProformaNR
+        import datetime
+
+        proforma = ProformaNR.objects.create(
+            project=active_project,
+            amount=amount,
+            date=datetime.date.today()
+        )
+
+        # Auto-generate a UserInvoice
+        try:
+            from app.project_admin.models import UserInvoice
+            UserInvoice.objects.create(
+                project=active_project,
+                created_by=request.user,
+                source_type=UserInvoice.SourceType.PROFORMA,
+                source_id=str(proforma.id),
+                description=description or "Proforma NR submission",
+                total=amount,
+                status=UserInvoice.Status.BUCKET,
+            )
+        except Exception as e:
+            import traceback
+            with open("/tmp/invoice_error.log", "a") as f:
+                f.write(f"Proforma Error: {str(e)}\n")
+                f.write(traceback.format_exc() + "\n")
+
+        return Response({
+            "message": "Proforma NR submitted successfully.",
+            "proforma_id": proforma.id
+        }, status=status.HTTP_201_CREATED)
+
+class EmployeeHistoryView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from app.project_admin.models import UserInvoice
+        
+        invoices = UserInvoice.objects.filter(created_by=request.user).order_by('-date', '-created_at')
+        
+        history_data = []
+        for invoice in invoices:
+            status_text = "Pending"
+            if invoice.status == UserInvoice.Status.BUCKET:
+                status_text = "Bucket"
+            elif invoice.finance_paid:
+                status_text = "Paid"
+            elif invoice.managing_director_approved or invoice.project_director_approved or invoice.contracts_manager_approved or invoice.manager_approved or invoice.supervisor_approved:
+                status_text = "Approved"
+            elif invoice.status == UserInvoice.Status.SUBMITTED:
+                status_text = "Submitted"
+
+            section = invoice.work_area or invoice.work_section or invoice.get_source_type_display()
+            
+            history_data.append({
+                "id": str(invoice.id),
+                "project": invoice.project.project_name if invoice.project else "Unknown",
+                "section": section,
+                "date": invoice.date.strftime("%b %d, %Y") if invoice.date else "",
+                "items": 1,
+                "amount": float(invoice.total),
+                "status": status_text,
+            })
+            
+        return Response({"history": history_data}, status=status.HTTP_200_OK)
