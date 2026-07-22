@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from app.account.models import CompanySupplier, SupplierProfile, UserAccount
-from app.procurement_department.models import Quotation, QuotationLineItem
+from app.procurement_department.models import Quotation, QuotationLineItem, QuotationHistory, OrderLineCallOff
 from app.project_admin.models import Project, ProjectFolder, ProjectSubfolder
 
 class SupplierProfileSerializer(serializers.ModelSerializer):
@@ -24,10 +24,51 @@ class InviteSupplierSerializer(serializers.Serializer):
 class QuotationLineItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuotationLineItem
-        fields = ('id', 'description', 'qty', 'discount', 'per', 'each', 'comments')
+        fields = ('id', 'description', 'qty', 'discount', 'per', 'each', 'comments', 'supplier_price')
+
+class QuotationHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuotationHistory
+        fields = ('id', 'message', 'previous_total', 'previous_pdf', 'previous_line_items', 'date_recorded')
+
+class OrderLineCallOffSerializer(serializers.ModelSerializer):
+    call_off_by_name = serializers.CharField(source='called_off_by.full_name', read_only=True)
+    approve_by_name = serializers.CharField(source='approved_by.full_name', read_only=True)
+
+    class Meta:
+        model = OrderLineCallOff
+        fields = '__all__'
+        read_only_fields = ('call_off_ref',)
+
+class CallOffLineItemSerializer(serializers.ModelSerializer):
+    history = OrderLineCallOffSerializer(source='call_offs', many=True, read_only=True)
+    qty_remaining = serializers.SerializerMethodField()
+    po_ref = serializers.CharField(source='quotation.quote_ref', read_only=True)
+    project_name = serializers.CharField(source='quotation.project.project_name', read_only=True)
+    main_folder_name = serializers.CharField(source='quotation.main_folder.name', read_only=True)
+    sub_folder_name = serializers.CharField(source='quotation.sub_folder.name', read_only=True)
+    variation_ref = serializers.CharField(source='quotation.variation_ref', read_only=True)
+    supplier_name = serializers.CharField(source='quotation.supplier.supplier.company_name', read_only=True)
+    supplier_email = serializers.CharField(source='quotation.supplier_email', read_only=True)
+
+    class Meta:
+        model = QuotationLineItem
+        fields = (
+            'id', 'description', 'qty', 'per', 'each', 
+            'po_ref', 'project_name', 'main_folder_name', 'sub_folder_name',
+            'variation_ref', 'supplier_name', 'supplier_email',
+            'management_approved', 'management_approved_date',
+            'qty_remaining', 'history'
+        )
+
+    def get_qty_remaining(self, obj):
+        called_off_qty = sum(c.qty for c in obj.call_offs.all())
+        return obj.qty - called_off_qty
+
 
 class QuotationSerializer(serializers.ModelSerializer):
     line_items = QuotationLineItemSerializer(many=True, required=False)
+    history = QuotationHistorySerializer(many=True, read_only=True)
     project_name = serializers.CharField(source='project.project_name', read_only=True)
     supplier_name = serializers.CharField(source='supplier.supplier.company_name', read_only=True)
     main_folder_name = serializers.CharField(source='main_folder.name', read_only=True)

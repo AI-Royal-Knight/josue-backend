@@ -46,7 +46,7 @@ class ProfileView(APIView):
 
     def get(self, request):
         data = ProfileService.get_profile(
-            request.user
+            request.user, context={"request": request}
         )
 
         return Response(data, status=status.HTTP_200_OK)
@@ -135,10 +135,12 @@ class ProfileView(APIView):
                 company.public_liability_document = request.FILES['public_liability_document']
             if 'employers_liability_document' in request.FILES:
                 company.employers_liability_document = request.FILES['employers_liability_document']
+            if 'company_logo' in request.FILES:
+                company.company_logo = request.FILES['company_logo']
                 
             company.save()
 
-        updated_data = ProfileService.get_profile(user)
+        updated_data = ProfileService.get_profile(user, context={"request": request})
         return Response(updated_data, status=status.HTTP_200_OK)
 
 

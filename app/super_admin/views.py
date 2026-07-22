@@ -293,8 +293,13 @@ class MonthlyInvoiceView(APIView):
 
     def get(self, request):
         year_str = request.query_params.get("year")
+        
         if not year_str:
-            return Response({"error": "year query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+            # If no year is provided, return all invoices using the list serializer
+            invoices = MonthlyInvoice.objects.all().order_by('-created_at')
+            from .serializers import MonthlyInvoiceListSerializer
+            serializer = MonthlyInvoiceListSerializer(invoices, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         
         try:
             year = int(year_str)
@@ -342,4 +347,29 @@ class MonthlyInvoiceView(APIView):
             "amount": str(invoice.amount) if invoice.amount else None,
             "is_sent": invoice.is_sent
         }, status=status.HTTP_200_OK)
+
+
+class MonthlyInvoiceDetailView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def patch(self, request, pk):
+        try:
+            invoice = MonthlyInvoice.objects.get(pk=pk)
+        except MonthlyInvoice.DoesNotExist:
+            return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        
+        if "is_paid" in data:
+            invoice.is_paid = data["is_paid"]
+            if invoice.is_paid:
+                invoice.payment_date = timezone.now()
+            else:
+                invoice.payment_date = None
+                
+        invoice.save()
+
+        from .serializers import MonthlyInvoiceListSerializer
+        serializer = MonthlyInvoiceListSerializer(invoice)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 

@@ -15,7 +15,7 @@ class CompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = Company
         fields = [
-            'id', 'company_name', 'company_number', 'building_number', 'street', 'town', 'city', 'postcode',
+            'id', 'company_name', 'company_logo', 'company_number', 'building_number', 'street', 'town', 'city', 'postcode',
             'vat_number', 'phone', 'utr', 'bank_name', 'bank_address', 'sort_code', 'account_number',
             'iban', 'swift_bic', 'public_liability_policy', 'public_liability_expiry', 
             'public_liability_document', 'employers_liability_policy', 'employers_liability_expiry', 

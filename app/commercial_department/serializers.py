@@ -96,7 +96,8 @@ class VariationSerializer(serializers.ModelSerializer):
         return f"£{total:.2f}"
 
     def get_variationAmount(self, obj):
-        return f"£{obj.total_amount:.2f}"
+        total = sum((line.labour + line.material) * line.qty for line in obj.lines.all())
+        return f"£{total:.2f}"
 
     def get_percentClaimed(self, obj):
         return f"{obj.percent_claimed}%"

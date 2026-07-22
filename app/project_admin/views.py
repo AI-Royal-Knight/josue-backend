@@ -129,23 +129,77 @@ class ProjectFinancialBreakdownView(APIView):
         while current_start <= today:
             current_end = current_start + relativedelta(months=1) - relativedelta(days=1)
             
-            # Period String
+            # Period String — includes year so each month row is unique
             month_name_start = calendar.month_name[current_start.month]
             month_name_end = calendar.month_name[current_end.month]
-            period_str = f"{current_start.day} {month_name_start[:3]} - {current_end.day} {month_name_end[:3]}"
+            period_str = f"{current_start.day} {month_name_start[:3]} {current_start.year} – {current_end.day} {month_name_end[:3]} {current_end.year}"
 
             # Queries
             # Variations
-            variations = Variation.objects.filter(project=project, date__lte=current_end, date__gte=current_start)
+            from django.db.models import F, Sum, ExpressionWrapper, DecimalField
+            from app.commercial_department.models import Variation
+
+            variations = Variation.objects.filter(
+                project=project, 
+                date__lte=current_end, 
+                date__gte=current_start
+            )
             var_agg = variations.aggregate(
-                val=Sum('total_amount'),
-                lab=Sum('lines__labour_target'),
+                val=Sum(
+                    ExpressionWrapper(
+                        (F('lines__labour') + F('lines__material')) * F('lines__qty'),
+                        output_field=DecimalField()
+                    )
+                ),
+                lab_val=Sum(
+                    ExpressionWrapper(
+                        F('lines__labour') * F('lines__qty'),
+                        output_field=DecimalField()
+                    )
+                ),
                 mat=Sum('lines__material')
             )
             var_val = var_agg['val'] or 0
-            var_lab = var_agg['lab'] or 0
+            var_lab_val = var_agg['lab_val'] or 0
             var_mat = var_agg['mat'] or 0
-            var_claim = 0  # Deprecated in new Variation schema
+
+            from app.project_admin.models import UserInvoice
+            var_invoices = UserInvoice.objects.filter(
+                project=project,
+                source_type=UserInvoice.SourceType.VARIATION,
+                status=UserInvoice.Status.SUBMITTED,
+                date__lte=current_end,
+                date__gte=current_start
+            )
+            var_ids = [str(vid) for vid in var_invoices.values_list('source_id', flat=True) if vid]
+            if var_ids:
+                var_lab_agg = Variation.objects.filter(id__in=var_ids).aggregate(lab=Sum('lines__labour_target'))
+                var_lab = var_lab_agg['lab'] or 0
+            else:
+                var_lab = 0
+            var_claim = 0
+            for vid in set(var_ids):
+                v = Variation.objects.filter(id=vid).first()
+                if not v:
+                    continue
+                v_lab_target = v.lines.aggregate(t=Sum('labour_target'))['t'] or 0
+                if v_lab_target <= 0:
+                    continue
+                    
+                v_total_agg = v.lines.aggregate(
+                    t=Sum(
+                        ExpressionWrapper(
+                            (F('labour') + F('material')) * F('qty'),
+                            output_field=DecimalField()
+                        )
+                    )
+                )
+                v_total = v_total_agg['t'] or 0
+                
+                user_claim = var_invoices.filter(source_id=str(vid)).aggregate(t=Sum('total'))['t'] or 0
+                
+                percentage = float(user_claim) / float(v_lab_target)
+                var_claim += float(v_total) * percentage
             
             # PO Call Offs
             pos = PurchaseOrder.objects.filter(project=project)
@@ -153,10 +207,16 @@ class ProjectFinancialBreakdownView(APIView):
             po_called_off = call_offs.aggregate(total=Sum('amount'))['total'] or 0
             
             # Proforma NR
-            proformas = ProformaNR.objects.filter(project=project, date__lte=current_end, date__gte=current_start)
-            prof_agg = proformas.aggregate(amt=Sum('amount'), mat=Sum('material_estimate'))
-            prof_nr = prof_agg['amt'] or 0
-            prof_nr_mat = prof_agg['mat'] or 0
+            from app.project_admin.models import UserInvoice
+            proformas = UserInvoice.objects.filter(
+                project=project, 
+                source_type=UserInvoice.SourceType.PROFORMA,
+                status=UserInvoice.Status.SUBMITTED,
+                date__lte=current_end, 
+                date__gte=current_start
+            )
+            prof_nr = proformas.aggregate(amt=Sum('total'))['amt'] or 0
+            prof_nr_mat = 0 # No material estimate on UserInvoice
             
             # Bookings
             project_value_booked = ProjectValueBooking.objects.filter(project=project, date__lte=current_end, date__gte=current_start, is_approved=True).aggregate(t=Sum('amount'))['t'] or 0
@@ -166,15 +226,99 @@ class ProjectFinancialBreakdownView(APIView):
             management_prelims = ManagementPrelimBooking.objects.filter(project=project, date__lte=current_end, date__gte=current_start, is_approved=True).aggregate(t=Sum('amount'))['t'] or 0
             
             # Derived fields
-            project_value = project_value_booked
+            # Use the project's actual value directly (not a booking aggregate)
+            project_value = float(project.project_value or 0)
             application_value = project_value + var_claim
             
-            # Overspend logic requires knowing actual labour cost, since we don't have payroll yet, default to 0
-            overspend = 0
-            
-            unclaimed = var_val - var_claim
+            # Unclaimed Logic and Overspend — both share the same two inputs:
+            #   labour_target = SUM(subfolder row labourTarget values)
+            #   user_invoices = SUM(SUBMITTED LABOUR_TARGET UserInvoices)
+            # Unclaimed  = MAX(labour_target - invoices, 0)
+            # Overspend  = MAX(invoices - labour_target, 0)
+            # Both are mutually exclusive — only one can be > 0 at a time.
+            from app.project_admin.models import FolderAssignment
+            period_assignments = FolderAssignment.objects.filter(
+                subfolder__folder__project=project
+            ).select_related('subfolder')
+            subfolder_map = {}
+            for a in period_assignments:
+                sub_id = a.subfolder.id
+                if sub_id not in subfolder_map:
+                    subfolder_map[sub_id] = {
+                        'subfolder': a.subfolder,
+                        'assignment_ids': []
+                    }
+                subfolder_map[sub_id]['assignment_ids'].append(str(a.id))
+
+            period_unclaimed = 0.0
+            period_overspend = 0.0
+
+            for data in subfolder_map.values():
+                sub = data['subfolder']
+                assignment_ids = data['assignment_ids']
+                rows = sub.rows or []
+
+                from django.db.models import Q
+
+                # Per-row comparison: each row has its own labour target and its own invoice
+                for row_index, row in enumerate(rows):
+                    row_lt = float(row.get('labourTarget', 0) or 0)
+                    if row_lt == 0:
+                        # If row has no target, skip (nothing to compare)
+                        continue
+
+                    # Find invoices submitted for this specific row (source_id = "aid:row_index")
+                    q_row = Q()
+                    for aid in assignment_ids:
+                        q_row |= Q(source_id=f"{aid}:{row_index}")
+
+                    row_invoiced = UserInvoice.objects.filter(
+                        q_row,
+                        project=project,
+                        source_type=UserInvoice.SourceType.LABOUR_TARGET,
+                        date__lte=current_end,
+                        date__gte=current_start,
+                    ).aggregate(t=Sum('total'))['t'] or 0
+                    row_invoiced = float(row_invoiced)
+
+                    period_unclaimed += max(row_lt - row_invoiced, 0.0)
+                    period_overspend += max(row_invoiced - row_lt, 0.0)
+
+                # Also handle subfolders with no rows but a top-level labour_target
+                if not rows and sub.labour_target:
+                    sub_lt = float(sub.labour_target)
+                    q_sub = Q()
+                    for aid in assignment_ids:
+                        q_sub |= Q(source_id=aid) | Q(source_id__startswith=f"{aid}:")
+                    sub_invoiced = float(UserInvoice.objects.filter(
+                        q_sub,
+                        project=project,
+                        source_type=UserInvoice.SourceType.LABOUR_TARGET,
+                        date__lte=current_end,
+                        date__gte=current_start,
+                    ).aggregate(t=Sum('total'))['t'] or 0)
+                    period_unclaimed += max(sub_lt - sub_invoiced, 0.0)
+                    period_overspend += max(sub_invoiced - sub_lt, 0.0)
+
+            unclaimed = period_unclaimed
+            overspend = period_overspend
+
             money_on_hold = 0  # no retainage module yet
             
+            from app.procurement_department.models import Quotation
+            var_pos = Quotation.objects.filter(
+                project=project,
+                status=Quotation.Status.APPROVED,
+                date_of_quote__lte=current_end,
+                date_of_quote__gte=current_start
+            ).exclude(
+                Q(variation_ref__isnull=True) | 
+                Q(variation_ref__exact="") | 
+                Q(variation_ref__iexact="none") | 
+                Q(variation_ref__exact="-")
+            )
+            var_po_raised = var_pos.aggregate(total=Sum('quote_total'))['total'] or 0
+
             breakdown_data.append({
                 "period": period_str,
                 "applicationValue": float(application_value),
@@ -190,15 +334,33 @@ class ProjectFinancialBreakdownView(APIView):
                 "proformaNR": float(prof_nr),
                 "proformaNRMaterialEstimate": float(prof_nr_mat),
                 "variationValue": float(var_val),
-                "variationLabourValue": 0, # not tracked separately from var_val yet
+                "variationLabourValue": float(var_lab_val),
                 "variationLabourTarget": float(var_lab),
-                "variationPoCalledOff": 0, # variation specific POs not tracked
+                "variationPoCalledOff": float(var_po_raised),
                 "variationClaimed": float(var_claim),
             })
             
             current_start += relativedelta(months=1)
-            
-        return Response({"breakdown": breakdown_data}, status=status.HTTP_200_OK)
+        # Total PO Raised Logic
+        from app.procurement_department.models import Quotation
+        from django.db.models import Q
+        
+        # Every approved Purchase Order contributes (normal POs only, no variation ref)
+        approved_pos = Quotation.objects.filter(
+            project=project,
+            status=Quotation.Status.APPROVED,
+        ).filter(
+            Q(variation_ref__isnull=True) | 
+            Q(variation_ref__exact="") | 
+            Q(variation_ref__iexact="none") | 
+            Q(variation_ref__exact="-")
+        )
+        total_po_raised = approved_pos.aggregate(total=Sum('quote_total'))['total'] or 0
+
+        return Response({
+            "breakdown": breakdown_data,
+            "total_po_raised": float(total_po_raised)
+        }, status=status.HTTP_200_OK)
 
 
 class ProjectDetailView(APIView):
@@ -732,11 +894,14 @@ class ProformaAccessListView(APIView):
     permission_classes = [CanManageProjectRoles]
 
     def get(self, request, pk):
-        if not request.user.company:
-            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            project = Project.objects.get(pk=pk, company=request.user.company)
-        except Project.DoesNotExist:
+        if request.user.role in ["admin", "project_admin"]:
+            if not request.user.company:
+                return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+            project = Project.objects.filter(pk=pk, company=request.user.company).first()
+        else:
+            project = request.user.assigned_projects.filter(pk=pk).first()
+
+        if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
         accesses = ProformaAccess.objects.filter(project=project)
@@ -744,11 +909,14 @@ class ProformaAccessListView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, pk):
-        if not request.user.company:
-            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            project = Project.objects.get(pk=pk, company=request.user.company)
-        except Project.DoesNotExist:
+        if request.user.role in ["admin", "project_admin"]:
+            if not request.user.company:
+                return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+            project = Project.objects.filter(pk=pk, company=request.user.company).first()
+        else:
+            project = request.user.assigned_projects.filter(pk=pk).first()
+
+        if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
         user_ids = request.data.get('user_ids', [])
@@ -775,10 +943,18 @@ class ProformaAccessDetailView(APIView):
     permission_classes = [CanManageProjectRoles]
 
     def patch(self, request, pk, access_pk):
-        if not request.user.company:
-            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.role in ["admin", "project_admin"]:
+            if not request.user.company:
+                return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+            project = Project.objects.filter(pk=pk, company=request.user.company).first()
+        else:
+            project = request.user.assigned_projects.filter(pk=pk).first()
+
+        if not project:
+            return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
         try:
-            access = ProformaAccess.objects.get(pk=access_pk, project__id=pk, project__company=request.user.company)
+            access = ProformaAccess.objects.get(pk=access_pk, project=project)
         except ProformaAccess.DoesNotExist:
             return Response({"error": "Access not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -791,10 +967,18 @@ class ProformaAccessDetailView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, access_pk):
-        if not request.user.company:
-            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.role in ["admin", "project_admin"]:
+            if not request.user.company:
+                return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+            project = Project.objects.filter(pk=pk, company=request.user.company).first()
+        else:
+            project = request.user.assigned_projects.filter(pk=pk).first()
+
+        if not project:
+            return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
         try:
-            access = ProformaAccess.objects.get(pk=access_pk, project__id=pk, project__company=request.user.company)
+            access = ProformaAccess.objects.get(pk=access_pk, project=project)
             access.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ProformaAccess.DoesNotExist:
@@ -808,11 +992,14 @@ class LoadingClearingAccessListView(APIView):
     permission_classes = [CanManageProjectRoles]
 
     def get(self, request, pk):
-        if not request.user.company:
-            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            project = Project.objects.get(pk=pk, company=request.user.company)
-        except Project.DoesNotExist:
+        if request.user.role in ["admin", "project_admin"]:
+            if not request.user.company:
+                return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+            project = Project.objects.filter(pk=pk, company=request.user.company).first()
+        else:
+            project = request.user.assigned_projects.filter(pk=pk).first()
+
+        if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
         accesses = LoadingClearingAccess.objects.filter(project=project)
@@ -820,11 +1007,14 @@ class LoadingClearingAccessListView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, pk):
-        if not request.user.company:
-            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            project = Project.objects.get(pk=pk, company=request.user.company)
-        except Project.DoesNotExist:
+        if request.user.role in ["admin", "project_admin"]:
+            if not request.user.company:
+                return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+            project = Project.objects.filter(pk=pk, company=request.user.company).first()
+        else:
+            project = request.user.assigned_projects.filter(pk=pk).first()
+
+        if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
         user_ids = request.data.get('user_ids', [])
@@ -851,10 +1041,18 @@ class LoadingClearingAccessDetailView(APIView):
     permission_classes = [CanManageProjectRoles]
 
     def patch(self, request, pk, access_pk):
-        if not request.user.company:
-            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.role in ["admin", "project_admin"]:
+            if not request.user.company:
+                return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+            project = Project.objects.filter(pk=pk, company=request.user.company).first()
+        else:
+            project = request.user.assigned_projects.filter(pk=pk).first()
+
+        if not project:
+            return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
         try:
-            access = LoadingClearingAccess.objects.get(pk=access_pk, project__id=pk, project__company=request.user.company)
+            access = LoadingClearingAccess.objects.get(pk=access_pk, project=project)
         except LoadingClearingAccess.DoesNotExist:
             return Response({"error": "Access not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -867,10 +1065,18 @@ class LoadingClearingAccessDetailView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, access_pk):
-        if not request.user.company:
-            return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.role in ["admin", "project_admin"]:
+            if not request.user.company:
+                return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
+            project = Project.objects.filter(pk=pk, company=request.user.company).first()
+        else:
+            project = request.user.assigned_projects.filter(pk=pk).first()
+
+        if not project:
+            return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
         try:
-            access = LoadingClearingAccess.objects.get(pk=access_pk, project__id=pk, project__company=request.user.company)
+            access = LoadingClearingAccess.objects.get(pk=access_pk, project=project)
             access.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except LoadingClearingAccess.DoesNotExist:

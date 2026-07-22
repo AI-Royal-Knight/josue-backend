@@ -53,6 +53,9 @@ class MonthlyInvoice(BaseModel):
         blank=True
     )
     is_sent = models.BooleanField(default=True)
+    is_paid = models.BooleanField(default=False)
+    payment_date = models.DateTimeField(null=True, blank=True)
+    invoice_number = models.CharField(max_length=50, unique=True, null=True, blank=True)
 
     class Meta:
         unique_together = ('company', 'year', 'month')

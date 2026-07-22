@@ -61,3 +61,12 @@ class AcceptCompanyInvitationSerializer(serializers.Serializer):
             raise serializers.ValidationError({"password": "Passwords must match."})
         return data
 
+from .models import MonthlyInvoice
+
+class MonthlyInvoiceListSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.company_name', read_only=True)
+
+    class Meta:
+        model = MonthlyInvoice
+        fields = ['id', 'company_name', 'year', 'month', 'amount', 'is_sent', 'is_paid', 'payment_date', 'invoice_number', 'created_at']
+

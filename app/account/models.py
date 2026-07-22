@@ -436,6 +436,8 @@ class UserProfile(BaseModel):
 class SupplierProfile(BaseModel):
     user = models.OneToOneField(UserAccount, on_delete=models.CASCADE, related_name="supplier_profile")
     company_name = models.CharField(max_length=255)
+    sort_code = models.CharField(max_length=20, blank=True, null=True)
+    account_number = models.CharField(max_length=50, blank=True, null=True)
     
     class Meta:
         db_table = "supplier_profiles"

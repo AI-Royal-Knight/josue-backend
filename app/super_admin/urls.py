@@ -7,6 +7,7 @@ from .views import (
     ValidateCompanyInvitationView,
     AcceptCompanyInvitationView,
     MonthlyInvoiceView,
+    MonthlyInvoiceDetailView,
 )
 
 urlpatterns = [
@@ -17,4 +18,5 @@ urlpatterns = [
     path('invitations/validate/<uuid:token>/', ValidateCompanyInvitationView.as_view(), name='Validate Company Invitation'),
     path('invitations/accept/', AcceptCompanyInvitationView.as_view(), name='Accept Company Invitation'),
     path('invoices/', MonthlyInvoiceView.as_view(), name='Monthly Invoices'),
+    path('invoices/<uuid:pk>/', MonthlyInvoiceDetailView.as_view(), name='Monthly Invoice Detail'),
 ]

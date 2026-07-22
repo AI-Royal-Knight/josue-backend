@@ -234,7 +234,8 @@ def generate_branded_po_pdf(parsed: dict, logo_path: str | None = None) -> bytes
 
     logo_cell = ""
     if logo_path and os.path.exists(logo_path):
-        logo_img = Image(logo_path, width=35*mm, height=14*mm)
+        logo_img = Image(logo_path, width=50*mm, height=20*mm, kind="proportional")
+        logo_img.hAlign = 'LEFT'
         logo_cell = logo_img
     else:
         logo_cell = Paragraph(
@@ -245,6 +246,7 @@ def generate_branded_po_pdf(parsed: dict, logo_path: str | None = None) -> bytes
 
     title_block = [
         Paragraph("PURCHASE ORDER", h1),
+        Spacer(1, 3*mm),
         Paragraph(f"Ref: {parsed.get('quotation_number', 'N/A')}", sub),
         Paragraph(f"Date: {parsed.get('quotation_date', date.today().strftime('%d/%m/%Y'))}", sub),
     ]
@@ -254,9 +256,10 @@ def generate_branded_po_pdf(parsed: dict, logo_path: str | None = None) -> bytes
         colWidths=[W * 0.35, W * 0.65],
     )
     header_tbl.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("VALIGN", (0, 0), (0, 0), "MIDDLE"),  # Logo vertically centered
+        ("VALIGN", (1, 0), (1, 0), "TOP"),     # Title block at the top
         ("ALIGN",  (1, 0), (1, 0),  "RIGHT"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.append(header_tbl)
     story.append(HRFlowable(width="100%", thickness=1.5, color=brand_color, spaceAfter=5))
@@ -353,3 +356,129 @@ def generate_branded_po_pdf(parsed: dict, logo_path: str | None = None) -> bytes
 
     doc.build(story)
     return buffer.getvalue()
+
+def generate_quotation_pdf(quotation, logo_path=None) -> bytes:
+    """
+    Generates a PDF for a given Quotation instance and returns it as bytes.
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+    from reportlab.lib.enums import TA_RIGHT, TA_CENTER, TA_LEFT
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=20*mm,
+        bottomMargin=20*mm
+    )
+
+    styles = getSampleStyleSheet()
+    
+    normal_style = styles["Normal"]
+    normal_style.fontSize = 10
+    normal_style.leading = 14
+
+    title_style = ParagraphStyle(
+        name="PO_Title",
+        parent=styles["Heading1"],
+        fontSize=18,
+        leading=22,
+        spaceAfter=15,
+        textColor=colors.HexColor("#2C3E50"),
+        alignment=TA_CENTER
+    )
+
+    meta_style = ParagraphStyle(
+        name="PO_Meta",
+        parent=styles["Normal"],
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor("#34495E")
+    )
+
+    elements = []
+
+    # Logo
+    if logo_path and os.path.exists(logo_path):
+        try:
+            logo = RLImage(logo_path)
+            logo.drawWidth = 50*mm
+            logo.drawHeight = 20*mm
+            logo.hAlign = 'LEFT'
+            elements.append(logo)
+            elements.append(Spacer(1, 10*mm))
+        except Exception:
+            pass
+
+    # Title
+    elements.append(Paragraph("REQUEST FOR QUOTATION", title_style))
+    
+    project_name = quotation.project.project_name if quotation.project else "N/A"
+    company_name = quotation.supplier.supplier.company_name if quotation.supplier and quotation.supplier.supplier else "N/A"
+    
+    # Metadata Table
+    meta_data = [
+        [Paragraph(f"<b>Quotation Ref:</b> {quotation.quote_ref}", meta_style),
+         Paragraph(f"<b>Date:</b> {quotation.date_of_quote.strftime('%d/%m/%Y')}", meta_style)],
+        [Paragraph(f"<b>Project:</b> {project_name}", meta_style),
+         Paragraph(f"<b>Supplier:</b> {company_name}", meta_style)],
+    ]
+    meta_table = Table(meta_data, colWidths=[90*mm, 90*mm])
+    meta_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    elements.append(meta_table)
+    elements.append(Spacer(1, 10*mm))
+
+    # Line Items Table
+    table_data = [["No.", "Description", "Quantity", "Per"]]
+    line_items = quotation.line_items.all()
+    
+    for idx, item in enumerate(line_items, start=1):
+        table_data.append([
+            str(idx),
+            Paragraph(item.description or "", normal_style),
+            str(item.qty),
+            str(item.per or "Each")
+        ])
+
+    items_table = Table(table_data, colWidths=[15*mm, 105*mm, 30*mm, 30*mm])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2C3E50")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
+
+        ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+        ('ALIGN', (2, 1), (3, -1), 'CENTER'),
+        
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.whitesmoke, colors.white])
+    ]))
+    
+    elements.append(items_table)
+    elements.append(Spacer(1, 15*mm))
+    
+    footer_text = "Please submit your pricing via the unique link provided in the email."
+    elements.append(Paragraph(footer_text, meta_style))
+
+    doc.build(elements)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    return pdf_bytes

@@ -36,7 +36,7 @@ class CanManageProjectFolders(BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        if request.user.role in ["admin", "project_admin", "managing_director", "project_director"]:
+        if request.user.role in ["admin", "project_admin"]:
             return True
             
         pk = view.kwargs.get('pk')
@@ -54,7 +54,7 @@ class CanManageProjectRoles(BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        if request.user.role in ["admin", "project_admin", "managing_director", "project_director"]:
+        if request.user.role in ["admin", "project_admin"]:
             return True
             
         pk = view.kwargs.get('pk')

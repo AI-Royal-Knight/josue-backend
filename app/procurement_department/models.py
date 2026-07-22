@@ -51,10 +51,20 @@ class Quotation(BaseModel):
     date_po_created = models.DateField(null=True, blank=True)
     
     procurement_comments = models.TextField(blank=True, null=True)
+    finance_comments = models.TextField(blank=True, null=True)
+    commercial_comments = models.TextField(blank=True, null=True)
     quote_approval_reasons = models.TextField(blank=True, null=True)
     requote_comments = models.TextField(blank=True, null=True)
+
+    paid = models.BooleanField(default=False)
+    paid_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name="paid_quotations")
+    date_scheduled = models.DateField(null=True, blank=True)
+    release_date = models.DateField(null=True, blank=True)
     
     created_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, related_name="created_quotations")
+    
+    supplier_token = models.CharField(max_length=100, blank=True, null=True)
+    supplier_quote_pdf = models.FileField(upload_to="supplier_quotes/", null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.quote_ref:
@@ -62,6 +72,11 @@ class Quotation(BaseModel):
             from django.utils import timezone
             short_id = str(uuid.uuid4()).split('-')[0].upper()
             self.quote_ref = f"QR-{timezone.now().year}-{short_id}"
+        
+        if not self.supplier_token:
+            import uuid
+            self.supplier_token = str(uuid.uuid4())
+            
         super().save(*args, **kwargs)
 
     class Meta:
@@ -80,9 +95,54 @@ class QuotationLineItem(BaseModel):
     per = models.CharField(max_length=50, blank=True, null=True)
     each = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     comments = models.TextField(blank=True, null=True)
+    supplier_price = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    
+    # Call Off List specific fields
+    management_approved = models.BooleanField(default=False)
+    management_approved_date = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = "quotation_line_items"
 
     def __str__(self):
         return f"{self.description} for {self.quotation.quote_ref}"
+
+
+class QuotationHistory(BaseModel):
+    quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name="history")
+    message = models.TextField(blank=True, null=True)
+    previous_total = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    previous_pdf = models.FileField(upload_to="supplier_quotes/history/", null=True, blank=True)
+    previous_line_items = models.JSONField(default=list)
+    date_recorded = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "quotation_history"
+        ordering = ["-date_recorded"]
+
+    def __str__(self):
+        return f"History for {self.quotation.quote_ref} on {self.date_recorded}"
+
+
+class OrderLineCallOff(BaseModel):
+    line_item = models.ForeignKey(QuotationLineItem, on_delete=models.CASCADE, related_name="call_offs")
+    call_off_ref = models.CharField(max_length=100)
+    date = models.DateField(auto_now_add=True)
+    qty = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=15, decimal_places=2)
+    expected_delivery_date = models.DateField(null=True, blank=True)
+    called_off_by = models.ForeignKey(UserAccount, related_name="called_off_items", on_delete=models.SET_NULL, null=True)
+    approved_by = models.ForeignKey(UserAccount, related_name="approved_call_offs", on_delete=models.SET_NULL, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.call_off_ref:
+            import uuid
+            self.call_off_ref = f"CO-{str(uuid.uuid4()).split('-')[0].upper()}"
+        super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = "order_line_call_offs"
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"{self.call_off_ref} for {self.line_item.description}"

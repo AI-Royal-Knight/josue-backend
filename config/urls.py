@@ -13,9 +13,16 @@ urlpatterns = [
     path('api/v1/commercial/', include('app.commercial_department.urls')),
     path('api/v1/procurement/', include('app.procurement_department.urls')),
     path('api/v1/contracts-manager/', include('app.contracts_manager.urls')),
+    path('api/v1/finance/', include('app.finance_department.urls')),
     
     # Swagger / OpenAPI
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

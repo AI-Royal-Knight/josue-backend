@@ -351,6 +351,172 @@ class SubmitLabourTargetView(APIView):
         except ValueError:
             return Response({"error": "Invalid value provided."}, status=status.HTTP_400_BAD_REQUEST)
 
+
+class SubfolderTasksView(APIView):
+    """
+    Returns the individual task rows for a specific subfolder assignment.
+    Each row represents a dedicated task with its sent_to_bucket status.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, assignment_id):
+        if request.user.role != 'employee':
+            return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
+
+        from app.project_admin.models import FolderAssignment, UserInvoice
+        try:
+            assignment = FolderAssignment.objects.select_related(
+                'subfolder', 'subfolder__folder', 'subfolder__folder__project'
+            ).get(id=assignment_id, user=request.user)
+        except FolderAssignment.DoesNotExist:
+            return Response({"error": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        subfolder = assignment.subfolder
+        rows = subfolder.rows or []
+
+        # Find which row indices have already been submitted as UserInvoices
+        # source_id format: "assignment_id:row_index"
+        submitted_source_ids = set(
+            UserInvoice.objects.filter(
+                project=subfolder.folder.project,
+                created_by=request.user,
+                source_type=UserInvoice.SourceType.LABOUR_TARGET,
+                source_id__startswith=f"{str(assignment_id)}:",
+            ).values_list('source_id', flat=True)
+        )
+        submitted_row_indices = set()
+        for sid in submitted_source_ids:
+            parts = sid.split(":")
+            if len(parts) == 2:
+                try:
+                    submitted_row_indices.add(int(parts[1]))
+                except ValueError:
+                    pass
+
+        tasks = []
+        for i, row in enumerate(rows):
+            work_section = row.get('workSection', '') or ''
+            work_area = row.get('workArea', '') or ''
+            labour_target = row.get('labourTarget', None)
+            project_value = row.get('projectValue', None)
+
+            # Skip completely empty rows
+            if not work_section and not work_area and not labour_target:
+                continue
+
+            tasks.append({
+                "row_index": i,
+                "work_section": work_section,
+                "work_area": work_area,
+                "labour_target": str(labour_target) if labour_target is not None else None,
+                "project_value": str(project_value) if project_value is not None else None,
+                "sent_to_bucket": i in submitted_row_indices,
+            })
+
+        # Sort tasks so unfinished (sent_to_bucket=False) appear first
+        tasks.sort(key=lambda t: (t['sent_to_bucket'], t['row_index']))
+
+        return Response({
+            "subfolder_name": subfolder.name,
+            "assignment_id": str(assignment.id),
+            "hide_labour_target": assignment.hide_labour_target,
+            "total_labour_target": str(assignment.subfolder.labour_target or 0),
+            "tasks": tasks,
+        }, status=status.HTTP_200_OK)
+
+
+class SubmitSubfolderTaskView(APIView):
+    """
+    Submits a single row/task from a subfolder to the bucket.
+    Each row is tracked individually via source_id = "assignment_id:row_index"
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, assignment_id):
+        if request.user.role != 'employee':
+            return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
+
+        from app.project_admin.models import FolderAssignment, UserInvoice
+        try:
+            assignment = FolderAssignment.objects.select_related(
+                'subfolder', 'subfolder__folder', 'subfolder__folder__project'
+            ).get(id=assignment_id, user=request.user)
+        except FolderAssignment.DoesNotExist:
+            return Response({"error": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        row_index = request.data.get('row_index')
+        if row_index is None:
+            return Response({"error": "row_index is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            row_index = int(row_index)
+        except (ValueError, TypeError):
+            return Response({"error": "row_index must be an integer."}, status=status.HTTP_400_BAD_REQUEST)
+
+        subfolder = assignment.subfolder
+        rows = subfolder.rows or []
+
+        if row_index < 0 or row_index >= len(rows):
+            return Response({"error": "Invalid row_index."}, status=status.HTTP_400_BAD_REQUEST)
+
+        row = rows[row_index]
+        work_section = row.get('workSection', '') or ''
+        work_area = row.get('workArea', '') or ''
+        labour_target = row.get('labourTarget', None)
+
+        # Check if already submitted
+        source_id = f"{str(assignment_id)}:{row_index}"
+        if UserInvoice.objects.filter(
+            project=subfolder.folder.project,
+            created_by=request.user,
+            source_type=UserInvoice.SourceType.LABOUR_TARGET,
+            source_id=source_id,
+        ).exists():
+            return Response({"error": "This task has already been sent to the bucket."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            amount = float(labour_target) if labour_target else 0.0
+        except (ValueError, TypeError):
+            amount = 0.0
+
+        # Allow employee to override amount if hide_labour_target is True
+        if assignment.hide_labour_target:
+            employee_amount = request.data.get('amount')
+            if employee_amount is not None:
+                try:
+                    amount = float(employee_amount)
+                except (ValueError, TypeError):
+                    return Response({"error": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+
+        description_parts = []
+        if work_section:
+            description_parts.append(work_section)
+        if work_area:
+            description_parts.append(work_area)
+        description = " – ".join(description_parts) if description_parts else subfolder.name
+
+        try:
+            UserInvoice.objects.create(
+                project=subfolder.folder.project,
+                created_by=request.user,
+                source_type=UserInvoice.SourceType.LABOUR_TARGET,
+                source_id=source_id,
+                work_area=work_area,
+                work_section=work_section,
+                description=f"Labour Target – {description}",
+                total=amount,
+                status=UserInvoice.Status.BUCKET,
+            )
+        except Exception as e:
+            import traceback
+            with open("/tmp/invoice_error.log", "a") as f:
+                f.write(f"Subfolder Task Error: {str(e)}\n")
+                f.write(traceback.format_exc() + "\n")
+            return Response({"error": "Failed to create invoice."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"message": "Task sent to bucket successfully.", "source_id": source_id}, status=status.HTTP_201_CREATED)
+
+
 from .models import RFI
 from .serializers import RFISerializer, DailyRegisterSerializer
 import cloudinary.uploader
