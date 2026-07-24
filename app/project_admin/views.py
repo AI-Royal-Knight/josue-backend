@@ -838,8 +838,54 @@ class DashboardRFIListView(APIView):
         else:
             rfis = RFI.objects.filter(project__in=user.assigned_projects.all())
 
+        if user.role == "technical_department":
+            rfis = rfis.filter(assigned_to_technical_department=True)
+
         serializer = DashboardRFISerializer(rfis.order_by('-created_at'), many=True)
         return Response({"rfis": serializer.data}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        user = request.user
+        project_id = request.data.get('project_id')
+        if not project_id:
+            return Response({"error": "project_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        from app.project_admin.models import Project
+        try:
+            project = Project.objects.get(id=project_id)
+        except Project.DoesNotExist:
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+        if user.role in ["admin", "project_admin", "super_admin"]:
+            if project.company != user.company:
+                return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+        else:
+            if project not in user.assigned_projects.all():
+                return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+                
+        description = request.data.get('description', '')
+        trade = request.data.get('trade', 'General')
+        document = request.FILES.get('document')
+        document_url = None
+        
+        if document:
+            from cloudinary.uploader import upload
+            try:
+                upload_data = upload(document)
+                document_url = upload_data.get('secure_url')
+            except Exception:
+                pass
+                
+        rfi = RFI.objects.create(
+            project=project,
+            created_by=user,
+            description=description,
+            trade=trade,
+            document_url=document_url
+        )
+        
+        serializer = DashboardRFISerializer(rfi)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class RFICloseView(APIView):
     permission_classes = [IsAuthenticated]
@@ -885,6 +931,26 @@ class RFIMessageCreateView(APIView):
                 
         serializer = RFIMessageSerializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+class RFIAssignTechnicalView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        user = request.user
+        if user.role not in ["contracts_manager", "manager", "managers", "supervisor", "admin", "project_admin", "super_admin"]:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            rfi = RFI.objects.get(pk=pk)
+        except RFI.DoesNotExist:
+            return Response({"error": "RFI not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        assigned = request.data.get("assigned_to_technical_department", False)
+        rfi.assigned_to_technical_department = bool(assigned)
+        rfi.save()
+
+        serializer = DashboardRFISerializer(rfi)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 from .models import ProformaAccess

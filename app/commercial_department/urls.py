@@ -5,6 +5,7 @@ from .views import (
     VariationSubmitToClientView,
     VariationAssignUsersView,
     MonthlyApplicationListCreateView,
+    MonthlyApplicationUpdateView,
     WhiteCardView,
 )
 
@@ -16,5 +17,6 @@ urlpatterns = [
     path("variations/<uuid:pk>/submit-to-client/", VariationSubmitToClientView.as_view(), name="variation-submit-client"),
     path("variations/<uuid:pk>/assign/", VariationAssignUsersView.as_view(), name="variation-assign-users"),
     path("monthly-applications/", MonthlyApplicationListCreateView.as_view(), name="monthly-applications"),
+    path("monthly-applications/<uuid:pk>/", MonthlyApplicationUpdateView.as_view(), name="monthly-application-update"),
     path("white-card/", WhiteCardView.as_view(), name="white-card"),
 ]

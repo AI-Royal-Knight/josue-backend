@@ -50,9 +50,9 @@ class DashboardRFISerializer(serializers.ModelSerializer):
     class Meta:
         model = RFI
         fields = [
-            'id', 'rfi_number', 'project_name', 'description', 'trade',
+            'id', 'rfi_number', 'project', 'project_name', 'description', 'trade',
             'status', 'document_url', 'created_at', 'closed_at',
-            'created_by_name', 'messages'
+            'created_by_name', 'messages', 'assigned_to_technical_department'
         ]
 
     def get_created_by_name(self, obj):

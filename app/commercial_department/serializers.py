@@ -123,6 +123,9 @@ class VariationSerializer(serializers.ModelSerializer):
 from .models import MonthlyApplication
 
 class MonthlyApplicationSerializer(serializers.ModelSerializer):
+    order_no = serializers.CharField(source="project.job_code", read_only=True)
+    order_value = serializers.DecimalField(source="project.project_value", max_digits=15, decimal_places=2, read_only=True)
+
     class Meta:
         model = MonthlyApplication
         fields = "__all__"

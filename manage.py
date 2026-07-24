@@ -12,7 +12,7 @@ def main():
     environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
     current_env = env('ENVIRONMENT', default='dev')
-
+ 
     if current_env == 'prod':
         os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     else:

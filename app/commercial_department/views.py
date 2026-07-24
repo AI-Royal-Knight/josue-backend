@@ -253,7 +253,63 @@ class MonthlyApplicationListCreateView(APIView):
         
         apps = MonthlyApplication.objects.filter(project_id=project_id)
         serializer = MonthlyApplicationSerializer(apps, many=True)
-        return Response({"monthly_applications": serializer.data})
+
+        # Calculate current draft based on approved invoices and variations
+        from app.project_admin.models import UserInvoice, ProjectSubfolder, Project
+        import uuid
+        
+        approved_invoices = UserInvoice.objects.filter(
+            project_id=project_id, 
+            source_type=UserInvoice.SourceType.LABOUR_TARGET
+        )
+        approved_assignment_ids = []
+        for inv in approved_invoices:
+            if inv.fully_approved and inv.source_id:
+                try:
+                    uuid.UUID(inv.source_id)
+                    approved_assignment_ids.append(inv.source_id)
+                except ValueError:
+                    pass
+
+        import datetime
+        now = datetime.datetime.now()
+        current_month_subfolders = ProjectSubfolder.objects.filter(
+            folder__project_id=project_id,
+            created_at__year=now.year,
+            created_at__month=now.month
+        )
+        contract_works_total = 0
+        for sub in current_month_subfolders:
+            for row in (sub.rows or []):
+                try:
+                    val = str(row.get('projectValue', '0')).strip()
+                    if val:
+                        contract_works_total += float(val)
+                except ValueError:
+                    pass
+
+        approved_variations = Variation.objects.filter(
+            project_id=project_id, 
+            approval_status=Variation.ApprovalStatus.APPROVED
+        )
+        variations_total = sum(float(v.amount_claimed) if v.amount_claimed else float(v.total_amount) for v in approved_variations)
+
+        original_project_value = sum(float(sub.project_value) for sub in ProjectSubfolder.objects.filter(folder__project_id=project_id))
+
+        project_obj = Project.objects.filter(id=project_id).first()
+        current_draft = {
+            "contract_works_total": contract_works_total,
+            "variations_total": variations_total,
+            "gross_total": contract_works_total + variations_total,
+            "original_project_value": original_project_value,
+            "order_no": project_obj.job_code if project_obj else "",
+            "order_value": float(project_obj.project_value) if project_obj else 0.0,
+        }
+        
+        return Response({
+            "monthly_applications": serializer.data,
+            "current_draft": current_draft
+        })
 
     def post(self, request):
         project_id = request.data.get("project_id")
@@ -263,10 +319,44 @@ class MonthlyApplicationListCreateView(APIView):
             return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
 
         # Basic financial snapshot calculations
-        contract_works_total = sum(float(sub.project_value) for sub in ProjectSubfolder.objects.filter(folder__project_id=project_id))
+        from app.project_admin.models import UserInvoice, ProjectSubfolder
+        import uuid
         
-        variations = Variation.objects.filter(project_id=project_id, approval_status="approved")
-        variations_total = sum(float(v.amount_claimed) for v in variations)
+        approved_invoices = UserInvoice.objects.filter(
+            project_id=project_id, 
+            source_type=UserInvoice.SourceType.LABOUR_TARGET
+        )
+        approved_assignment_ids = []
+        for inv in approved_invoices:
+            if inv.fully_approved and inv.source_id:
+                try:
+                    uuid.UUID(inv.source_id)
+                    approved_assignment_ids.append(inv.source_id)
+                except ValueError:
+                    pass
+
+        import datetime
+        now = datetime.datetime.now()
+        current_month_subfolders = ProjectSubfolder.objects.filter(
+            folder__project_id=project_id,
+            created_at__year=now.year,
+            created_at__month=now.month
+        )
+        contract_works_total = 0
+        for sub in current_month_subfolders:
+            for row in (sub.rows or []):
+                try:
+                    val = str(row.get('projectValue', '0')).strip()
+                    if val:
+                        contract_works_total += float(val)
+                except ValueError:
+                    pass
+        
+        approved_variations = Variation.objects.filter(
+            project_id=project_id, 
+            approval_status=Variation.ApprovalStatus.APPROVED
+        )
+        variations_total = sum(float(v.amount_claimed) if v.amount_claimed else float(v.total_amount) for v in approved_variations)
         
         count = MonthlyApplication.objects.filter(project_id=project_id).count()
         app_number = count + 1
@@ -299,14 +389,52 @@ class WhiteCardView(APIView):
         groups = []
         for folder in folders:
             groups.append({
-                "groupId": folder.name.lower().replace(" ", "_"),
+                "groupId": str(folder.id),
                 "headerName": folder.name,
                 "subfolders": [
                     {
+                        "id": str(sub.id),
                         "name": sub.name,
-                        "project_value": float(sub.project_value)
+                        "project_value": float(sub.project_value),
+                        "labour_target": float(sub.labour_target) if hasattr(sub, 'labour_target') else 0.0,
+                        "rows": sub.rows if isinstance(sub.rows, list) else []
                     } for sub in folder.subfolders.all()
                 ]
             })
 
         return Response({"groups": groups})
+
+class MonthlyApplicationUpdateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            app = MonthlyApplication.objects.get(pk=pk)
+        except MonthlyApplication.DoesNotExist:
+            return Response({"error": "Monthly Application not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+        if not check_project_access(request.user, app.project_id):
+            return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
+            
+        certified_amount = request.data.get("certified_amount")
+        if certified_amount is not None:
+            try:
+                app.client_certified_amount = float(certified_amount)
+            except (ValueError, TypeError):
+                pass
+                
+        payment_certificate = request.FILES.get("payment_certificate")
+        if payment_certificate:
+            try:
+                upload_result = cloudinary.uploader.upload(
+                    payment_certificate,
+                    resource_type='auto',
+                    folder=f"josue_applications/{app.project_id}"
+                )
+                app.payment_certificate_url = upload_result.get('secure_url')
+            except Exception as e:
+                return Response({"error": f"Failed to upload invoice: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+                
+        app.save()
+        serializer = MonthlyApplicationSerializer(app)
+        return Response(serializer.data, status=status.HTTP_200_OK)

@@ -54,6 +54,7 @@ class RFI(BaseModel):
     document_url = models.URLField(max_length=500, blank=True, null=True)
     
     closed_at = models.DateTimeField(null=True, blank=True)
+    assigned_to_technical_department = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-created_at']

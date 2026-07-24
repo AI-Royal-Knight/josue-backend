@@ -112,6 +112,17 @@ class MonthlyApplication(BaseModel):
     amount_claimed = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     client_certified_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
 
+    # Editable date fields
+    works_valued_to_date = models.DateField(null=True, blank=True)
+    payment_notice_date = models.DateField(null=True, blank=True)
+    final_date_for_payment = models.DateField(null=True, blank=True)
+
+    # Certified amount entered by commercial after client pays
+    certified_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+
+    # Payment certificate PDF uploaded by commercial
+    payment_certificate_url = models.URLField(max_length=1000, blank=True, default="")
+
     class Meta:
         db_table = "monthly_applications"
         unique_together = ('project', 'application_number')
@@ -119,3 +130,19 @@ class MonthlyApplication(BaseModel):
 
     def __str__(self):
         return f"{self.project.project_name} - App {self.application_number}"
+
+    @property
+    def gross_total(self):
+        return self.contract_works_total + self.variations_total
+
+    @property
+    def retention_amount(self):
+        return self.gross_total * (self.retention_percentage / 100)
+
+    @property
+    def discount_amount(self):
+        return self.gross_total * (self.discount_percentage / 100)
+
+    @property
+    def net_application(self):
+        return self.gross_total - self.retention_amount - self.discount_amount

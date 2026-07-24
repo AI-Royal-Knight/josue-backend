@@ -84,6 +84,7 @@ class UserAccount(
         SUPERVISOR = "supervisor", "Supervisor"
         EMPLOYEE = "employee", "Employee"
         SUPPLIER = "supplier", "Supplier"
+        TECHNICAL_DEPARTMENT = "technical_department", "Technical Department"
 
     email = models.EmailField(
         _("email address"),
