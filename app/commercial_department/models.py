@@ -35,6 +35,20 @@ class Variation(BaseModel):
     approved_by = models.ForeignKey(
         UserAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_variations"
     )
+    # Role Signatures
+    supervisor_approved = models.BooleanField(default=False)
+    supervisor_approved_date = models.DateField(null=True, blank=True)
+    manager_approved = models.BooleanField(default=False)
+    manager_approved_date = models.DateField(null=True, blank=True)
+    contracts_manager_approved = models.BooleanField(default=False)
+    contracts_manager_approved_date = models.DateField(null=True, blank=True)
+    project_director_approved = models.BooleanField(default=False)
+    project_director_approved_date = models.DateField(null=True, blank=True)
+    managing_director_approved = models.BooleanField(default=False)
+    managing_director_approved_date = models.DateField(null=True, blank=True)
+    commercial_department_approved = models.BooleanField(default=False)
+    commercial_department_approved_date = models.DateField(null=True, blank=True)
+    fully_approved = models.BooleanField(default=False)
 
     # Client
     submitted_to_client = models.BooleanField(default=False)

@@ -66,6 +66,20 @@ class Quotation(BaseModel):
     supplier_token = models.CharField(max_length=100, blank=True, null=True)
     supplier_quote_pdf = models.FileField(upload_to="supplier_quotes/", null=True, blank=True)
 
+    # Signatures
+    sig_procurement_department = models.BooleanField(default=False)
+    sig_procurement_department_date = models.DateField(null=True, blank=True)
+    sig_contracts_manager = models.BooleanField(default=False)
+    sig_contracts_manager_date = models.DateField(null=True, blank=True)
+    sig_project_director = models.BooleanField(default=False)
+    sig_project_director_date = models.DateField(null=True, blank=True)
+    sig_managing_director = models.BooleanField(default=False)
+    sig_managing_director_date = models.DateField(null=True, blank=True)
+    sig_commercial_department = models.BooleanField(default=False)
+    sig_commercial_department_date = models.DateField(null=True, blank=True)
+    
+    fully_approved = models.BooleanField(default=False)
+
     def save(self, *args, **kwargs):
         if not self.quote_ref:
             import uuid

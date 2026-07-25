@@ -187,6 +187,48 @@ class VariationApprovalView(APIView):
         variation.save()
         return Response(VariationSerializer(variation).data)
 
+class VariationToggleSignatureView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            variation = Variation.objects.get(pk=pk)
+        except Variation.DoesNotExist:
+            return Response({"error": "Variation not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not check_project_access(request.user, variation.project_id):
+            return Response(
+                {"error": "You do not have access to this project's variations."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        user = request.user
+        role = user.role
+        if role == "managers":
+            role = "manager"
+
+        ROLE_TO_FIELD = {
+            "supervisor": ("supervisor_approved", "supervisor_approved_date"),
+            "manager": ("manager_approved", "manager_approved_date"),
+            "contracts_manager": ("contracts_manager_approved", "contracts_manager_approved_date"),
+            "project_director": ("project_director_approved", "project_director_approved_date"),
+            "managing_director": ("managing_director_approved", "managing_director_approved_date"),
+            "commercial_department": ("commercial_department_approved", "commercial_department_approved_date"),
+        }
+
+        if role not in ROLE_TO_FIELD:
+            return Response({"error": "Your role is not permitted to sign variations."}, status=status.HTTP_403_FORBIDDEN)
+
+        approve = request.data.get("approve", True)
+        sig_field, date_field = ROLE_TO_FIELD[role]
+
+        setattr(variation, sig_field, approve)
+        import datetime
+        setattr(variation, date_field, datetime.date.today() if approve else None)
+        
+        variation.save()
+        return Response(VariationSerializer(variation).data)
+
 
 class VariationSubmitToClientView(APIView):
     permission_classes = [permissions.IsAuthenticated]

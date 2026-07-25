@@ -207,13 +207,44 @@ class QuotationViewSet(viewsets.ModelViewSet):
             
         quotation.quote_total = total
         quotation.status = Quotation.Status.APPROVED
-        quotation.save(update_fields=['status', 'quote_total'])
-        
-        # We can also handle specific logic if we want to create POCallOff records here, 
-        # but for now we just approve it so its line items appear in Call Off list.
+        quotation.fully_approved = True
+        quotation.save(update_fields=['status', 'quote_total', 'fully_approved'])
         
         serializer = self.get_serializer(quotation)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def toggle_signature(self, request, pk=None):
+        quotation = self.get_object()
+        user = request.user
+        role = user.role
+        
+        if role == "managers":
+            role = "manager"
+            
+        ROLE_TO_FIELD = {
+            "procurement_department": ("sig_procurement_department", "sig_procurement_department_date"),
+            "contracts_manager": ("sig_contracts_manager", "sig_contracts_manager_date"),
+            "project_director": ("sig_project_director", "sig_project_director_date"),
+            "managing_director": ("sig_managing_director", "sig_managing_director_date"),
+            "commercial_department": ("sig_commercial_department", "sig_commercial_department_date"),
+        }
+        
+        if role not in ROLE_TO_FIELD:
+            return Response({"error": "Your role is not permitted to sign purchase orders."}, status=status.HTTP_403_FORBIDDEN)
+            
+        approve = request.data.get("approve", True)
+        sig_field, date_field = ROLE_TO_FIELD[role]
+        
+        setattr(quotation, sig_field, approve)
+        
+        import datetime
+        setattr(quotation, date_field, datetime.date.today() if approve else None)
+        
+        quotation.save()
+        
+        serializer = self.get_serializer(quotation)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         quotation = serializer.save(created_by=self.request.user)

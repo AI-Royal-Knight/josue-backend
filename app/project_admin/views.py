@@ -771,7 +771,10 @@ from .models import ApprovalConfiguration
 from .serializers import ApprovalConfigurationSerializer
 
 class ProjectApprovalConfigurationsView(APIView):
-    permission_classes = [IsAdminOrProjectAdmin]
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsAuthenticated()]
+        return [IsAdminOrProjectAdmin()]
 
     def get(self, request, pk):
         if not request.user.company:
