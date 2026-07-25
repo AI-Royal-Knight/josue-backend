@@ -9,7 +9,7 @@ try:
     # Create some dummy notifications
     notifications = [
         {
-            "title": "Welcome to Josue",
+            "title": "Welcome to Tresta",
             "body": "Your account has been successfully created and approved.",
             "type": Notification.Type.INFO,
             "created_at": timezone.now() - timedelta(days=2)

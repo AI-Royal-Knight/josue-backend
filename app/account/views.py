@@ -375,7 +375,7 @@ class ForgotPasswordView(APIView):
             frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
             reset_link = f"{frontend_url}/reset-password?uid={uid}&token={token}"
             
-            subject = "Reset Your Password"
+            subject = "Reset Your Password - Tresta"
             message = (
                 f"Hello {user.first_name},\n\n"
                 f"You requested to reset your password. Please click the link below to set a new password:\n"
@@ -384,12 +384,39 @@ class ForgotPasswordView(APIView):
                 f"Thank you."
             )
             
+            html_message = f"""
+            <!DOCTYPE html>
+            <html>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px; margin: 0; color: #3f3f46;">
+                <div style="max-w-[600px] margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div style="background-color: #2563eb; padding: 30px; text-align: center;">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 1px;">PASSWORD RESET</h1>
+                    </div>
+                    <div style="padding: 40px 30px;">
+                        <p style="margin-top: 0; font-size: 16px; line-height: 24px;">Hello <strong>{user.first_name}</strong>,</p>
+                        <p style="font-size: 16px; line-height: 24px;">We received a request to reset the password for your account. If you made this request, please click the button below to set a new password:</p>
+                        
+                        <div style="text-align: center; margin: 35px 0;">
+                            <a href="{reset_link}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 16px;">Reset Password</a>
+                        </div>
+                        
+                        <p style="font-size: 14px; line-height: 22px; color: #71717a; margin-bottom: 0;">If you did not request a password reset, you can safely ignore this email. Your account is secure.</p>
+                    </div>
+                    <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+                        <p style="margin: 0; font-size: 12px; color: #94a3b8;">&copy; 2026 Tresta. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+            
             send_mail(
                 subject,
                 message,
                 getattr(settings, 'DEFAULT_FROM_EMAIL', 'info@tresta.cloud'),
                 [user.email],
                 fail_silently=True,
+                html_message=html_message,
             )
 
         return Response({"success": True, "message": "If an account with that email exists, a reset link has been sent."})

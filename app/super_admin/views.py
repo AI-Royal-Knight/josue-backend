@@ -41,7 +41,7 @@ class CompaniesView(APIView):
         companies = Company.objects.prefetch_related(
             Prefetch(
                 'users', 
-                queryset=UserAccount.objects.filter(role=UserAccount.Role.ADMIN), 
+                queryset=UserAccount.objects.filter(role__in=[UserAccount.Role.ADMIN, UserAccount.Role.PROJECT_ADMIN]), 
                 to_attr='admin_users'
             )
         ).order_by('-created_at')
@@ -188,12 +188,41 @@ class CompanyDetailView(APIView):
                                 f'This link will expire in 7 days.\n\n'
                                 f'Thank you.'
                             )
+                            
+                            html_message = f"""
+                            <!DOCTYPE html>
+                            <html>
+                            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px; margin: 0; color: #3f3f46;">
+                                <div style="max-w: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                                    <div style="background-color: #2563eb; padding: 30px; text-align: center;">
+                                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 1px;">WELCOME TO TRESTA</h1>
+                                    </div>
+                                    <div style="padding: 40px 30px;">
+                                        <p style="margin-top: 0; font-size: 16px; line-height: 24px;">Hello <strong>{admin_user.first_name}</strong>,</p>
+                                        <p style="font-size: 16px; line-height: 24px;">Your request to join as an Admin for <strong>{company.company_name}</strong> has been officially approved! We are thrilled to have you on board.</p>
+                                        <p style="font-size: 16px; line-height: 24px;">To get started and set up your account password, please click the button below:</p>
+                                        
+                                        <div style="text-align: center; margin: 35px 0;">
+                                            <a href="{invitation_link}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 16px;">Set Up Account</a>
+                                        </div>
+                                        
+                                        <p style="font-size: 14px; line-height: 22px; color: #71717a; margin-bottom: 0;">Please note that this link is valid for 7 days. If you did not request this access, you can safely ignore this email.</p>
+                                    </div>
+                                    <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+                                        <p style="margin: 0; font-size: 12px; color: #94a3b8;">&copy; 2026 Tresta. All rights reserved.</p>
+                                    </div>
+                                </div>
+                            </body>
+                            </html>
+                            """
+
                             send_mail(
                                 subject,
                                 message,
                                 settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
                                 [admin_user.email],
                                 fail_silently=False,
+                                html_message=html_message,
                             )
                             
                             RecentActivity.objects.create(
