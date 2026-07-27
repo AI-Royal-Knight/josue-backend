@@ -36,6 +36,7 @@ class UserSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'role',
+            'secondary_role',
             'profile',
             'company',
             'stats'
@@ -57,6 +58,7 @@ class LoginSerializer(serializers.Serializer):
 class SendInvitationSerializer(serializers.Serializer):
     email = serializers.EmailField()
     role = serializers.CharField()
+    secondary_role = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     company_id = serializers.IntegerField(required=False)
     project_id = serializers.IntegerField(required=False)
 
@@ -74,9 +76,18 @@ class AcceptInvitationSerializer(serializers.Serializer):
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
+class VerifyOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=4)
+
 class ResetPasswordSerializer(serializers.Serializer):
-    uid = serializers.CharField()
-    token = serializers.CharField()
+    # URL token-based
+    uid = serializers.CharField(required=False, allow_blank=True)
+    token = serializers.CharField(required=False, allow_blank=True)
+    # OTP-based
+    email = serializers.EmailField(required=False, allow_blank=True)
+    otp = serializers.CharField(required=False, allow_blank=True, max_length=4)
+    
     new_password = serializers.CharField(write_only=True)
 
 class ChangePasswordSerializer(serializers.Serializer):

@@ -14,13 +14,18 @@ class CompanyListSerializer(serializers.ModelSerializer):
     admin_email = serializers.SerializerMethodField()
     user = serializers.SerializerMethodField()
     projects = serializers.SerializerMethodField()
+    invoices_count = serializers.SerializerMethodField()
+    rfis_count = serializers.SerializerMethodField()
+    storage_usage = serializers.SerializerMethodField()
+    uploaded_files_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Company
         fields = [
             'id', 'company_name', 'admin_name', 'admin_surname', 'admin_email',
             'phone', 'user', 'projects', 'activate', 'monthly_subscription',
-            'per_user_rate', 'auto_monthly_inv', 'status'
+            'per_user_rate', 'auto_monthly_inv', 'status',
+            'invoices_count', 'rfis_count', 'storage_usage', 'uploaded_files_count'
         ]
 
     def get_admin_name(self, obj):
@@ -50,6 +55,26 @@ class CompanyListSerializer(serializers.ModelSerializer):
         if obj.company_name:
             return Project.objects.filter(company__company_name__iexact=obj.company_name.strip()).count()
         return Project.objects.filter(company=obj).count()
+
+    def get_invoices_count(self, obj):
+        from app.project_admin.models import UserInvoice
+        if obj.company_name:
+            return UserInvoice.objects.filter(project__company__company_name__iexact=obj.company_name.strip()).count()
+        return UserInvoice.objects.filter(project__company=obj).count()
+
+    def get_rfis_count(self, obj):
+        from app.employee.models import RFI
+        if obj.company_name:
+            return RFI.objects.filter(project__company__company_name__iexact=obj.company_name.strip()).count()
+        return RFI.objects.filter(project__company=obj).count()
+
+    def get_storage_usage(self, obj):
+        # TODO: Implement actual storage calculation if a centralized File model is added
+        return "1.2 GB"
+
+    def get_uploaded_files_count(self, obj):
+        # TODO: Implement actual file count if a centralized File model is added
+        return 42
 
 class AcceptCompanyInvitationSerializer(serializers.Serializer):
     token = serializers.UUIDField()

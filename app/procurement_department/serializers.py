@@ -81,6 +81,9 @@ class QuotationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         line_items_data = validated_data.pop('line_items', [])
+        if validated_data.get('po_created') and not validated_data.get('date_po_created'):
+            from django.utils import timezone
+            validated_data['date_po_created'] = timezone.now().date()
         quotation = Quotation.objects.create(**validated_data)
         for item_data in line_items_data:
             QuotationLineItem.objects.create(quotation=quotation, **item_data)

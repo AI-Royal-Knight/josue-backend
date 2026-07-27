@@ -633,7 +633,7 @@ class RAMSCreateView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
-        if request.user.role not in ['manager', 'project_director', 'admin', 'super_admin']:
+        if request.user.role not in ['managers', 'project_director', 'admin', 'super_admin']:
             return Response({"error": "Only managers can create operations."}, status=status.HTTP_403_FORBIDDEN)
             
         project_id = request.data.get('project_id')
@@ -678,7 +678,7 @@ class DailyBriefingCreateView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
-        if request.user.role not in ['manager', 'project_director', 'admin', 'super_admin']:
+        if request.user.role not in ['managers', 'project_director', 'admin', 'super_admin']:
             return Response({"error": "Only managers can create operations."}, status=status.HTTP_403_FORBIDDEN)
             
         project_id = request.data.get('project_id')
@@ -725,7 +725,7 @@ class ToolboxTalkCreateView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
-        if request.user.role not in ['manager', 'project_director', 'admin', 'super_admin']:
+        if request.user.role not in ['managers', 'project_director', 'admin', 'super_admin']:
             return Response({"error": "Only managers can create operations."}, status=status.HTTP_403_FORBIDDEN)
             
         project_id = request.data.get('project_id')
@@ -814,7 +814,7 @@ class ToDoCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        if request.user.role != 'manager':
+        if request.user.role not in ['managers', 'project_director', 'admin', 'super_admin']:
             return Response({"error": "Only managers can create To Do items."}, status=status.HTTP_403_FORBIDDEN)
         project_id = request.data.get('project_id')
         title = request.data.get('title')

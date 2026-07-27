@@ -20,7 +20,7 @@ from .serializers import (
     ProjectUpdateSerializer,
 )
 
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from datetime import date
 from dateutil.relativedelta import relativedelta
 import calendar
@@ -96,6 +96,18 @@ class ProjectListCreateView(APIView):
         serializer = ProjectCreateSerializer(data=request.data)
         if serializer.is_valid():
             project = serializer.save(company=request.user.company)
+            
+            # Automatically assign the creator to the project as a Project Admin
+            from app.account.models import RoleAssignment, UserAccount
+            
+            RoleAssignment.objects.create(
+                user=request.user,
+                role=UserAccount.Role.PROJECT_ADMIN,
+                project=project,
+                company=request.user.company
+            )
+            request.user.assigned_projects.add(project)
+
             return Response(
                 ProjectListSerializer(project).data,
                 status=status.HTTP_201_CREATED,
@@ -258,7 +270,7 @@ class ProjectFinancialBreakdownView(APIView):
                 assignment_ids = data['assignment_ids']
                 rows = sub.rows or []
 
-                from django.db.models import Q
+                
 
                 # Per-row comparison: each row has its own labour target and its own invoice
                 for row_index, row in enumerate(rows):
@@ -343,7 +355,7 @@ class ProjectFinancialBreakdownView(APIView):
             current_start += relativedelta(months=1)
         # Total PO Raised Logic
         from app.procurement_department.models import Quotation
-        from django.db.models import Q
+        
         
         # Every approved Purchase Order contributes (normal POs only, no variation ref)
         approved_pos = Quotation.objects.filter(
@@ -445,7 +457,7 @@ class CompanyUsersView(APIView):
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
         
         from app.account.models import UserAccount
-        from django.db.models import Q
+        
         
         company = request.user.company
         company_query = Q(company=company)
@@ -470,7 +482,8 @@ class CompanyUsersView(APIView):
             users_data.append({
                 "id": str(user.id),
                 "name": name,
-                "email": user.email
+                "email": user.email,
+                "role": user.role
             })
             
         print(f"CompanyUsersView(role={role_param}, company={request.user.company}) returned {len(users_data)} users.")
@@ -540,7 +553,7 @@ class ProjectRoleAssignmentsView(APIView):
             return Response({"error": "role_key is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         from app.account.models import RoleAssignment, UserAccount
-        from django.db.models import Q
+        
         
         # Verify users exist and are in the company (using the same logic as GET)
         company = request.user.company
@@ -553,46 +566,81 @@ class ProjectRoleAssignmentsView(APIView):
 
         users = UserAccount.objects.filter(company_query, id__in=user_ids).distinct()
         
-        # Get existing assignments for this role
-        old_assignments = RoleAssignment.objects.filter(role=role_key, project=project)
-        old_user_ids = list(old_assignments.values_list('user_id', flat=True))
+        try:
+            # Get existing assignments for this role
+            old_assignments = RoleAssignment.objects.filter(role=role_key, project=project)
+            old_user_ids = list(old_assignments.values_list('user_id', flat=True))
 
-        # Delete existing assignments for this role and project
-        old_assignments.delete()
-        
-        # Create new assignments
-        for user in users:
-            RoleAssignment.objects.create(
-                user=user,
-                role=role_key,
-                project=project,
-                company=request.user.company
-            )
-            # Add project to user's assigned projects list so they can see it
-            if not user.assigned_projects.filter(id=project.id).exists():
-                user.assigned_projects.add(project)
-                # Create a notification for the user
-                from app.account.models import Notification
-                Notification.objects.create(
-                    user=user,
-                    title="Project Assigned",
-                    body=f"You have been assigned to {project.project_name} as {role_key}.",
-                    type=Notification.Type.PROJECT_ASSIGNED
-                )
+            # Validation: Admin, Super Admin, and Project Admin are mutually exclusive with all other project roles
+            top_roles = ["project_admin", "admin", "super_admin"]
             
-        # For any user removed from this role, if they have no other roles in the project,
-        # remove the project from their assigned_projects
-        for uid in old_user_ids:
-            if uid not in [u.id for u in users]:
-                still_assigned = RoleAssignment.objects.filter(user_id=uid, project=project).exists()
-                if not still_assigned:
-                    try:
-                        u = UserAccount.objects.get(id=uid)
-                        u.assigned_projects.remove(project)
-                    except UserAccount.DoesNotExist:
-                        pass
-        
-        return Response({"message": "Role assignments updated successfully."}, status=status.HTTP_200_OK)
+            # Check newly assigned users
+            new_users = users.exclude(id__in=old_user_ids)
+            for user in new_users:
+                if user.role in ["admin", "super_admin"]:
+                    return Response(
+                        {"error": f"User {user.email} is an Admin and cannot be assigned to project roles."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                existing_roles = RoleAssignment.objects.filter(user=user, project=project).exclude(role=role_key).values_list('role', flat=True)
+                
+                if role_key in top_roles:
+                    if existing_roles.exists():
+                        return Response(
+                            {"error": f"User {user.email} is already assigned to another role in this project and cannot be a Project Admin."}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                else:
+                    if "project_admin" in existing_roles or user.role == "project_admin":
+                        return Response(
+                            {"error": f"User {user.email} is a Project Admin and cannot be assigned to another role."}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+            # Delete existing assignments for this role and project
+            old_assignments.delete()
+            
+            # Create new assignments
+            for user in users:
+                RoleAssignment.objects.create(
+                    user=user,
+                    role=role_key,
+                    project=project,
+                    company=request.user.company
+                )
+                # Add project to user's assigned projects list so they can see it
+                if not user.assigned_projects.filter(id=project.id).exists():
+                    user.assigned_projects.add(project)
+                    # Create a notification for the user
+                    from app.account.models import Notification
+                    Notification.objects.create(
+                        user=user,
+                        title="Project Assigned",
+                        body=f"You have been assigned to {project.project_name} as {role_key}.",
+                        type=Notification.Type.PROJECT_ASSIGNED
+                    )
+            
+            # For any user removed from this role, if they have no other roles in the project,
+            # remove the project from their assigned_projects
+            for uid in old_user_ids:
+                if uid not in [u.id for u in users]:
+                    still_assigned = RoleAssignment.objects.filter(user_id=uid, project=project).exists()
+                    if not still_assigned:
+                        try:
+                            u = UserAccount.objects.get(id=uid)
+                            u.assigned_projects.remove(project)
+                        except UserAccount.DoesNotExist:
+                            pass
+            
+            return Response({"message": "Role assignments updated successfully."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            import traceback
+            error_msg = f"Exception in post: {str(e)}\n{traceback.format_exc()}"
+            print(error_msg)
+            with open("/tmp/django_500_error.log", "w") as f:
+                f.write(error_msg)
+            return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
 
 from .models import ProjectFolder, ProjectSubfolder

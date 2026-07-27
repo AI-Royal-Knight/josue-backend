@@ -482,3 +482,238 @@ def generate_quotation_pdf(quotation, logo_path=None) -> bytes:
     buffer.close()
 
     return pdf_bytes
+
+def generate_branded_call_off_pdf(call_off_obj, logo_path=None) -> bytes:
+    """
+    Generates a PDF for a given OrderLineCallOff instance and returns it as bytes.
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+    from reportlab.lib.enums import TA_RIGHT, TA_CENTER, TA_LEFT
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=20*mm,
+        bottomMargin=20*mm
+    )
+
+    styles = getSampleStyleSheet()
+    normal_style = styles["Normal"]
+    normal_style.fontSize = 10
+    normal_style.leading = 14
+
+    title_style = ParagraphStyle(
+        name="PO_Title",
+        parent=styles["Heading1"],
+        fontSize=18,
+        leading=22,
+        spaceAfter=15,
+        textColor=colors.HexColor("#2C3E50"),
+        alignment=TA_CENTER
+    )
+
+    elements = []
+
+    # Logo
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = RLImage(logo_path, width=40*mm, height=40*mm, kind='proportional')
+            img.hAlign = 'CENTER'
+            elements.append(img)
+            elements.append(Spacer(1, 10*mm))
+        except Exception:
+            pass
+
+    elements.append(Paragraph("Call Off Order", title_style))
+    elements.append(Spacer(1, 10*mm))
+
+    # Meta Info
+    line_item = call_off_obj.line_item
+    quotation = line_item.quotation
+    
+    meta_data = [
+        ["Call Off Ref:", call_off_obj.call_off_ref, "PO Ref:", quotation.quote_ref],
+        ["Project:", quotation.project.project_name, "Date:", call_off_obj.date.strftime('%Y-%m-%d')],
+        ["Supplier:", quotation.supplier.supplier.company_name, "Expected Delivery:", call_off_obj.expected_delivery_date.strftime('%Y-%m-%d') if call_off_obj.expected_delivery_date else "N/A"]
+    ]
+
+    meta_table = Table(meta_data, colWidths=[30*mm, 55*mm, 30*mm, 55*mm])
+    meta_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#333333")),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(meta_table)
+    elements.append(Spacer(1, 15*mm))
+
+    # Items Table
+    table_data = [
+        ["Item Description", "Qty", "Price", "Total"]
+    ]
+    
+    total = call_off_obj.qty * call_off_obj.price
+    table_data.append([
+        Paragraph(line_item.description, normal_style),
+        str(call_off_obj.qty),
+        f"£{call_off_obj.price}",
+        f"£{total}"
+    ])
+
+    items_table = Table(table_data, colWidths=[80*mm, 20*mm, 35*mm, 35*mm])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2C3E50")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 10*mm))
+
+    # Grand Total
+    elements.append(Paragraph(f"<b>Grand Total:</b> £{total}", ParagraphStyle(
+        name="RightAlign",
+        parent=normal_style,
+        alignment=TA_RIGHT,
+        fontSize=12
+    )))
+
+    doc.build(elements)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+def generate_combined_call_off_pdf(call_offs, logo_path=None):
+    from io import BytesIO
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from reportlab.platypus import Image as RLImage
+    import os
+    from django.utils import timezone
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=20*mm,
+        bottomMargin=20*mm
+    )
+
+    styles = getSampleStyleSheet()
+    normal_style = styles["Normal"]
+    normal_style.fontSize = 10
+    normal_style.leading = 14
+
+    title_style = ParagraphStyle(
+        name="PO_Title",
+        parent=styles["Heading1"],
+        fontSize=18,
+        leading=22,
+        spaceAfter=15,
+        textColor=colors.HexColor("#2C3E50"),
+        alignment=TA_CENTER
+    )
+
+    elements = []
+
+    # Logo
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = RLImage(logo_path, width=40*mm, height=40*mm, kind='proportional')
+            img.hAlign = 'CENTER'
+            elements.append(img)
+            elements.append(Spacer(1, 10*mm))
+        except Exception:
+            pass
+
+    elements.append(Paragraph("Combined Call Off Order", title_style))
+    elements.append(Spacer(1, 10*mm))
+
+    # Meta Info
+    first_co = call_offs.first()
+    line_item = first_co.line_item
+    quotation = line_item.quotation
+    
+    meta_data = [
+        ["PO Ref:", quotation.quote_ref, "Project:", quotation.project.project_name],
+        ["Supplier:", quotation.supplier.supplier.company_name, "Date:", timezone.now().strftime('%Y-%m-%d')],
+    ]
+
+    meta_table = Table(meta_data, colWidths=[30*mm, 55*mm, 30*mm, 55*mm])
+    meta_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#333333")),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(meta_table)
+    elements.append(Spacer(1, 15*mm))
+
+    # Items Table
+    table_data = [
+        ["Call Off Ref", "Item Description", "Qty", "Price", "Total"]
+    ]
+    
+    grand_total = 0
+    for co in call_offs:
+        total = co.qty * co.price
+        grand_total += total
+        table_data.append([
+            co.call_off_ref,
+            Paragraph(co.line_item.description, normal_style),
+            str(co.qty),
+            f"£{co.price}",
+            f"£{total}"
+        ])
+
+    items_table = Table(table_data, colWidths=[30*mm, 70*mm, 20*mm, 25*mm, 25*mm])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2C3E50")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 10*mm))
+
+    # Grand Total
+    elements.append(Paragraph(f"<b>Grand Total:</b> £{grand_total}", ParagraphStyle(
+        name="RightAlign",
+        parent=normal_style,
+        alignment=TA_RIGHT,
+        fontSize=12
+    )))
+
+    doc.build(elements)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes

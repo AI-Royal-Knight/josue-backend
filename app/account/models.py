@@ -111,6 +111,13 @@ class UserAccount(
         default=Role.ADMIN,
     )
 
+    secondary_role = models.CharField(
+        max_length=30,
+        choices=Role.choices,
+        blank=True,
+        null=True,
+    )
+
     company = models.ForeignKey(
         'Company',
         on_delete=models.SET_NULL,
@@ -148,6 +155,23 @@ class UserAccount(
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
+
+    def clean(self):
+        super().clean()
+        from django.core.exceptions import ValidationError
+        
+        # Enforce rule: super_admin, admin, project_admin can only have one role
+        if self.role in [self.Role.SUPER_ADMIN, self.Role.ADMIN, self.Role.PROJECT_ADMIN]:
+            if self.secondary_role:
+                raise ValidationError({
+                    "secondary_role": f"Users with role '{self.role}' cannot have a secondary role."
+                })
+        
+        # Ensure roles are distinct
+        if self.role and self.secondary_role and self.role == self.secondary_role:
+            raise ValidationError({
+                "secondary_role": "Secondary role must be different from the primary role."
+            })
 
     objects = CustomAccountManager()
 
@@ -471,6 +495,7 @@ class Invitation(BaseModel):
 
     email = models.EmailField()
     role = models.CharField(max_length=50, choices=UserAccount.Role.choices)
+    secondary_role = models.CharField(max_length=50, choices=UserAccount.Role.choices, blank=True, null=True)
     
     # Context
     company = models.ForeignKey(Company, on_delete=models.CASCADE, null=True, blank=True)

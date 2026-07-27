@@ -7,6 +7,7 @@ from .views import (
     ValidateInvitationView,
     AcceptInvitationView,
     ForgotPasswordView,
+    VerifyOTPView,
     ResetPasswordView,
     ChangePasswordView,
     SubmitApplicationView,
@@ -35,6 +36,7 @@ urlpatterns = [
 
     # Password Reset
     path('forgot-password/', ForgotPasswordView.as_view(), name='Forgot Password'),
+    path('verify-otp/', VerifyOTPView.as_view(), name='Verify OTP'),
     path('reset-password/', ResetPasswordView.as_view(), name='Reset Password'),
     path('change-password/', ChangePasswordView.as_view(), name='Change Password'),
 

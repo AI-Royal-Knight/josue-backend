@@ -20,11 +20,14 @@ from .serializers import (
     SendInvitationSerializer,
     AcceptInvitationSerializer,
     ForgotPasswordSerializer,
+    VerifyOTPSerializer,
     ResetPasswordSerializer,
     SubmitApplicationSerializer,
     ChangePasswordSerializer,
 )
 from .tokens import get_tokens_for_user
+import random
+from django.core.cache import cache
 from .models import Invitation, RoleAssignment, UserProfile, SupplierProfile, CompanySupplier, Company, UserAccount
 from app.project_admin.models import Project
 
@@ -205,15 +208,29 @@ class LoginView(APIView):
 
         tokens = get_tokens_for_user(user)
 
+        from app.account.models import RoleAssignment
+        assignments = RoleAssignment.objects.filter(user=user)
+        role_assignments_data = [
+            {
+                "id": str(a.id),
+                "role": a.role,
+                "company_id": str(a.company_id) if a.company_id else None,
+                "project_id": str(a.project_id) if a.project_id else None,
+            }
+            for a in assignments
+        ]
+
         response_data = {
             "success": True,
             "access_token": tokens["access"],
             "refresh_token": tokens["refresh"],
             "user": {
                 "role": user.role,
+                "secondary_role": getattr(user, 'secondary_role', None),
                 "email": user.email,
                 "first_name": user.first_name or "",
                 "last_name": user.last_name or "",
+                "role_assignments": role_assignments_data,
             }
         }
 
@@ -251,6 +268,7 @@ class SendInvitationView(APIView):
         invitation = Invitation.objects.create(
             email=email,
             role=role,
+            secondary_role=serializer.validated_data.get("secondary_role"),
             company=request.user.company,
             invited_by=request.user,
             expires_at=timezone.now() + timezone.timedelta(days=7)
@@ -330,6 +348,7 @@ class AcceptInvitationView(APIView):
                 'first_name': serializer.validated_data["first_name"],
                 'last_name': serializer.validated_data["last_name"],
                 'role': invitation.role,
+                'secondary_role': invitation.secondary_role,
                 'company': invitation.company,
                 'is_active': True,
             }
@@ -345,6 +364,13 @@ class AcceptInvitationView(APIView):
             company=invitation.company,
             project=invitation.project
         )
+        if invitation.secondary_role:
+            RoleAssignment.objects.get_or_create(
+                user=user,
+                role=invitation.secondary_role,
+                company=invitation.company,
+                project=invitation.project
+            )
         
         # Mark invitation as accepted
         invitation.status = Invitation.Status.ACCEPTED
@@ -372,13 +398,19 @@ class ForgotPasswordView(APIView):
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             
+            # OTP generation
+            otp = f"{random.randint(0, 9999):04d}"
+            cache.set(f"password_reset_otp_{user.email}", otp, timeout=900)
+            
             frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
             reset_link = f"{frontend_url}/reset-password?uid={uid}&token={token}"
             
             subject = "Reset Your Password - Tresta"
             message = (
                 f"Hello {user.first_name},\n\n"
-                f"You requested to reset your password. Please click the link below to set a new password:\n"
+                f"You requested to reset your password. Please use the following 4-digit code in the app:\n"
+                f"{otp}\n\n"
+                f"Or, click the link below to set a new password:\n"
                 f"{reset_link}\n\n"
                 f"If you did not request this, please ignore this email.\n\n"
                 f"Thank you."
@@ -394,9 +426,15 @@ class ForgotPasswordView(APIView):
                     </div>
                     <div style="padding: 40px 30px;">
                         <p style="margin-top: 0; font-size: 16px; line-height: 24px;">Hello <strong>{user.first_name}</strong>,</p>
-                        <p style="font-size: 16px; line-height: 24px;">We received a request to reset the password for your account. If you made this request, please click the button below to set a new password:</p>
+                        <p style="font-size: 16px; line-height: 24px;">We received a request to reset the password for your account.</p>
                         
-                        <div style="text-align: center; margin: 35px 0;">
+                        <p style="font-size: 16px; line-height: 24px; margin-top: 20px;">If you are using the app, enter this 4-digit verification code:</p>
+                        <div style="text-align: center; margin: 20px 0;">
+                            <span style="background-color: #f1f5f9; color: #0f172a; padding: 12px 24px; border-radius: 6px; font-size: 28px; font-weight: 700; letter-spacing: 8px;">{otp}</span>
+                        </div>
+                        
+                        <p style="font-size: 16px; line-height: 24px; margin-top: 30px;">Or, click the button below to set a new password:</p>
+                        <div style="text-align: center; margin: 20px 0 35px 0;">
                             <a href="{reset_link}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 16px;">Reset Password</a>
                         </div>
                         
@@ -422,6 +460,26 @@ class ForgotPasswordView(APIView):
         return Response({"success": True, "message": "If an account with that email exists, a reset link has been sent."})
 
 
+class VerifyOTPView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=VerifyOTPSerializer, responses={200: dict})
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        otp = serializer.validated_data["otp"]
+        
+        cached_otp = cache.get(f"password_reset_otp_{email}")
+        
+        if not cached_otp or cached_otp != otp:
+            return Response({"error": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response({"success": True, "message": "OTP verified successfully."})
+
+
 class ResetPasswordView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -431,18 +489,39 @@ class ResetPasswordView(APIView):
         if not serializer.is_valid():
             return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
 
-        uid_b64 = serializer.validated_data["uid"]
-        token = serializer.validated_data["token"]
+        uid_b64 = serializer.validated_data.get("uid")
+        token = serializer.validated_data.get("token")
+        email = serializer.validated_data.get("email")
+        otp = serializer.validated_data.get("otp")
         new_password = serializer.validated_data["new_password"]
+        
+        user = None
 
-        try:
-            uid = force_str(urlsafe_base64_decode(uid_b64))
-            user = UserAccount.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, UserAccount.DoesNotExist):
-            return Response({"error": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
+        if email and otp:
+            # OTP based verification
+            cached_otp = cache.get(f"password_reset_otp_{email}")
+            if not cached_otp or cached_otp != otp:
+                return Response({"error": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            user = UserAccount.objects.filter(email=email).first()
+            if not user:
+                return Response({"error": "User not found."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            # Clear the OTP after successful use
+            cache.delete(f"password_reset_otp_{email}")
+            
+        elif uid_b64 and token:
+            # URL Token based verification
+            try:
+                uid = force_str(urlsafe_base64_decode(uid_b64))
+                user = UserAccount.objects.get(pk=uid)
+            except (TypeError, ValueError, OverflowError, UserAccount.DoesNotExist):
+                return Response({"error": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not default_token_generator.check_token(user, token):
-            return Response({"error": "Invalid or expired reset link."}, status=status.HTTP_400_BAD_REQUEST)
+            if not default_token_generator.check_token(user, token):
+                return Response({"error": "Invalid or expired reset link."}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "Must provide either uid/token or email/otp."}, status=status.HTTP_400_BAD_REQUEST)
 
         user.set_password(new_password)
         user.save()
@@ -589,6 +668,7 @@ class UsersListView(APIView):
                 "email": u.email,
                 "phone": company.phone if company else "",
                 "role": u.role,
+                "secondaryRole": getattr(u, 'secondary_role', None),
                 "profession": dict(UserAccount.Role.choices).get(u.role, u.role),
                 "cscsCardNo": profile.cscs_card_no if profile else "",
                 "cscsExpiryDate": str(profile.cscs_expiry_date) if profile and profile.cscs_expiry_date else "",

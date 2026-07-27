@@ -1,3 +1,4 @@
+import os
 from rest_framework.views import APIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -42,7 +43,7 @@ class SupplierListView(APIView):
             # Fall back to suppliers linked to user's assigned projects' companies
             company_ids = request.user.assigned_projects.values_list('company_id', flat=True)
             if not company_ids:
-                return Response({"detail": "No project access given."}, status=status.HTTP_403_FORBIDDEN)
+                return Response([], status=status.HTTP_200_OK)
             suppliers = CompanySupplier.objects.filter(company_id__in=company_ids).distinct()
             serializer = CompanySupplierSerializer(suppliers, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -158,7 +159,7 @@ class ProcurementProjectListView(APIView):
         # Fetch projects the user is explicitly assigned to
         projects = request.user.assigned_projects.all()
         if not projects.exists():
-            return Response({"detail": "No project access given."}, status=status.HTTP_403_FORBIDDEN)
+            return Response([], status=status.HTTP_200_OK)
             
         serializer = ProjectNestedSerializer(projects, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -205,10 +206,13 @@ class QuotationViewSet(viewsets.ModelViewSet):
             line_total = float(qty) * float(price) * (1.0 - (float(discount) / 100.0))
             total += decimal.Decimal(str(round(line_total, 2)))
             
+        from django.utils import timezone
         quotation.quote_total = total
         quotation.status = Quotation.Status.APPROVED
         quotation.fully_approved = True
-        quotation.save(update_fields=['status', 'quote_total', 'fully_approved'])
+        quotation.po_created = True
+        quotation.date_po_created = timezone.now().date()
+        quotation.save(update_fields=['status', 'quote_total', 'fully_approved', 'po_created', 'date_po_created'])
         
         serializer = self.get_serializer(quotation)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -586,3 +590,158 @@ class CallOffListViewSet(viewsets.GenericViewSet, viewsets.mixins.ListModelMixin
         
         serializer = self.get_serializer(line_item)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ApproveCallOffView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        from django.core.mail import EmailMessage
+        from django.template.loader import render_to_string
+        from .models import OrderLineCallOff
+        from .pdf_utils import generate_branded_call_off_pdf
+        import traceback
+        
+        call_off = get_object_or_404(OrderLineCallOff, pk=pk)
+        
+        if call_off.approved_by:
+            return Response({"detail": "Call Off is already approved."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Mark as approved
+        call_off.approved_by = request.user
+        call_off.save()
+        
+        # Get details for PDF and Email
+        line_item = call_off.line_item
+        quotation = line_item.quotation
+        company = request.user.company
+        
+        logo_path = None
+        if not company or not company.company_logo:
+            from app.account.models import Company
+            company = Company.objects.exclude(company_logo='').first()
+
+        if company and company.company_logo:
+            try:
+                logo_path = company.company_logo.path
+            except Exception:
+                pass
+                
+        if not logo_path:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            candidate = os.path.join(base_dir, "app", "static", "logo.png")
+            if os.path.exists(candidate):
+                logo_path = candidate
+                
+        # Generate PDF
+        pdf_bytes = generate_branded_call_off_pdf(call_off, logo_path=logo_path)
+        
+        # Prepare Email
+        supplier_email = quotation.supplier_email
+        if supplier_email:
+            context = {
+                'call_off_ref': call_off.call_off_ref,
+                'supplier_name': quotation.supplier.supplier.company_name if quotation.supplier else 'Supplier',
+                'project_name': quotation.project.project_name,
+                'po_ref': quotation.quote_ref,
+                'description': line_item.description,
+                'qty': call_off.qty,
+                'expected_delivery': call_off.expected_delivery_date.strftime('%Y-%m-%d') if call_off.expected_delivery_date else 'Not specified',
+                'company_name': company.company_name if company else 'Tresta'
+            }
+            
+            html_content = render_to_string('emails/call_off_email.html', context)
+            
+            email = EmailMessage(
+                subject=f'New Call Off Order: {call_off.call_off_ref}',
+                body=html_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[supplier_email],
+            )
+            email.content_subtype = 'html'
+            email.attach(f'{call_off.call_off_ref}.pdf', pdf_bytes, 'application/pdf')
+            try:
+                email.send()
+            except Exception as e:
+                print(f"Error sending email: {e}")
+                # Even if email fails, we consider it approved
+        
+            return Response({"detail": "Approved successfully."}, status=status.HTTP_200_OK)
+
+class ApproveAllCallOffsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, po_ref):
+        from django.core.mail import EmailMessage
+        from django.template.loader import render_to_string
+        from .models import OrderLineCallOff
+        from .pdf_utils import generate_combined_call_off_pdf
+        
+        # Get all pending call-offs for this PO
+        pending_call_offs = OrderLineCallOff.objects.filter(
+            line_item__quotation__quote_ref=po_ref,
+            approved_by__isnull=True
+        )
+        
+        if not pending_call_offs.exists():
+            return Response({"detail": "No pending call-offs found for this PO."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Extract quotation and company details from the first item
+        first_call_off = pending_call_offs.first()
+        quotation = first_call_off.line_item.quotation
+        company = request.user.company
+        
+        logo_path = None
+        if not company or not company.company_logo:
+            from app.account.models import Company
+            company = Company.objects.exclude(company_logo='').first()
+
+        if company and company.company_logo:
+            try:
+                logo_path = company.company_logo.path
+            except Exception:
+                pass
+                
+        if not logo_path:
+            import os
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            candidate = os.path.join(base_dir, "app", "static", "logo.png")
+            if os.path.exists(candidate):
+                logo_path = candidate
+
+        # Generate combined PDF
+        pdf_bytes = generate_combined_call_off_pdf(pending_call_offs, logo_path=logo_path)
+        
+        # Mark all as approved
+        for call_off in pending_call_offs:
+            call_off.approved_by = request.user
+            call_off.save()
+        
+        # Prepare Email
+        supplier_email = quotation.supplier_email
+        if supplier_email:
+            # We'll pass the list of call_offs to the template
+            context = {
+                'po_ref': po_ref,
+                'supplier_name': quotation.supplier.supplier.company_name if quotation.supplier else 'Supplier',
+                'project_name': quotation.project.project_name,
+                'call_offs': pending_call_offs,
+                'company_name': company.company_name if company else 'Tresta'
+            }
+            
+            html_content = render_to_string('emails/combined_call_off_email.html', context)
+            
+            email = EmailMessage(
+                subject=f'New Combined Call Off Order for PO: {po_ref}',
+                body=html_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[supplier_email],
+            )
+            email.content_subtype = 'html'
+            email.attach(f'{po_ref}_Combined_CallOffs.pdf', pdf_bytes, 'application/pdf')
+            try:
+                email.send()
+            except Exception as e:
+                print(f"Error sending combined email: {e}")
+        
+        return Response({"detail": f"Approved {pending_call_offs.count()} call-offs successfully."}, status=status.HTTP_200_OK)

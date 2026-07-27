@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Call Off Order: {{ call_off_ref }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background-color: #2C3E50;
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .content p {
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .details-table th, .details-table td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #eeeeee;
+        }
+        .details-table th {
+            color: #777777;
+            font-weight: normal;
+            width: 40%;
+        }
+        .details-table td {
+            font-weight: bold;
+            color: #333333;
+        }
+        .footer {
+            background-color: #f9f9f9;
+            color: #777777;
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            border-top: 1px solid #eeeeee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>New Call Off Order</h1>
+        </div>
+        <div class="content">
+            <p>Dear {{ supplier_name }},</p>
+            <p>Please find attached our new Call Off Order <strong>{{ call_off_ref }}</strong> for <strong>{{ project_name }}</strong>. Below are the summary details:</p>
+            
+            <table class="details-table">
+                <tr>
+                    <th>Call Off Reference</th>
+                    <td>{{ call_off_ref }}</td>
+                </tr>
+                <tr>
+                    <th>Purchase Order Reference</th>
+                    <td>{{ po_ref }}</td>
+                </tr>
+                <tr>
+                    <th>Project</th>
+                    <td>{{ project_name }}</td>
+                </tr>
+                <tr>
+                    <th>Item Description</th>
+                    <td>{{ description }}</td>
+                </tr>
+                <tr>
+                    <th>Quantity Called Off</th>
+                    <td>{{ qty }}</td>
+                </tr>
+                <tr>
+                    <th>Expected Delivery</th>
+                    <td>{{ expected_delivery }}</td>
+                </tr>
+            </table>
+
+            <p>Please review the attached PDF for the full, formal Call Off Order. If you have any questions or concerns regarding this order or the delivery date, please get in touch with us immediately.</p>
+            <p>Thank you for your continued partnership.</p>
+            <p>Best regards,<br/><strong>{{ company_name }}</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message. Please do not reply directly to this email unless you have queries regarding the attached Call Off.</p>
+        </div>
+    </div>
+</body>
+</html>

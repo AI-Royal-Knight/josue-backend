@@ -14,5 +14,7 @@ urlpatterns = [
     path('po/parse-pdf/', ParsePOPDFView.as_view(), name='po-parse-pdf'),
     path('po/generate-pdf/', GenerateBrandedPOPDFView.as_view(), name='po-generate-pdf'),
     path('supplier-quote/<str:token>/', views.SupplierQuotationView.as_view(), name='supplier-quote'),
+    path('call-offs-approve/<uuid:pk>/', views.ApproveCallOffView.as_view(), name='call-off-approve'),
+    path('call-offs-approve-all/<str:po_ref>/', views.ApproveAllCallOffsView.as_view(), name='call-off-approve-all'),
     path('', include(router.urls)),
 ]

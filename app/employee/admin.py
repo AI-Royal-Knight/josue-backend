@@ -15,3 +15,29 @@ class RFIAdmin(admin.ModelAdmin):
     list_filter = ('status', 'project')
     search_fields = ('rfi_number',)
     readonly_fields = ('rfi_number',)
+
+from .models import RAMS, DailyBriefing, ToolboxTalk, ToDoList
+
+@admin.register(RAMS)
+class RAMSAdmin(admin.ModelAdmin):
+    list_display = ('title', 'project', 'date', 'review_date', 'completed_at')
+    list_filter = ('project', 'date')
+    search_fields = ('title', 'project__project_name')
+
+@admin.register(DailyBriefing)
+class DailyBriefingAdmin(admin.ModelAdmin):
+    list_display = ('title', 'project', 'date', 'completed_at')
+    list_filter = ('project', 'date')
+    search_fields = ('title', 'project__project_name')
+
+@admin.register(ToolboxTalk)
+class ToolboxTalkAdmin(admin.ModelAdmin):
+    list_display = ('title', 'project', 'date', 'completed_at')
+    list_filter = ('project', 'date')
+    search_fields = ('title', 'project__project_name')
+
+@admin.register(ToDoList)
+class ToDoListAdmin(admin.ModelAdmin):
+    list_display = ('title', 'project', 'date', 'completion_date', 'assign_user', 'completed_at')
+    list_filter = ('project', 'date')
+    search_fields = ('title', 'assign_user', 'project__project_name')
