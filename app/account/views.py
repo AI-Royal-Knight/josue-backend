@@ -7,6 +7,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
 
@@ -291,12 +292,19 @@ class SendInvitationView(APIView):
             f"Thank you."
         )
         
+        html_message = render_to_string('emails/invite_email.html', {
+            'role_display': role_display,
+            'company_name': company_name,
+            'invitation_link': invitation_link,
+        })
+        
         send_mail(
             subject,
             message,
             getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@tresta.com'),
             [email],
             fail_silently=False,
+            html_message=html_message,
         )
         
         RecentActivity.objects.create(activity_name=f"{request.user.get_role_display()} invited {email} as {role_display}.")

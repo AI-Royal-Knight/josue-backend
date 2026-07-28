@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from django.utils import timezone
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from django.conf import settings
 
 from app.account.models import CompanySupplier, SupplierProfile, UserAccount, Invitation, RoleAssignment
@@ -132,12 +133,20 @@ class SupplierInviteView(APIView):
                 f"This link will expire in 7 days.\n\n"
                 f"Thank you."
             )
+            
+            html_message = render_to_string('emails/invite_email.html', {
+                'role_display': 'Supplier',
+                'company_name': company.company_name,
+                'invitation_link': invitation_link,
+            })
+            
             send_mail(
                 subject,
                 message,
                 getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@payparo.tech'),
                 [email],
                 fail_silently=False,
+                html_message=html_message,
             )
 
             return Response({

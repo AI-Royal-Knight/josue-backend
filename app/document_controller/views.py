@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -61,12 +62,19 @@ class InviteEmployeeView(APIView):
             f"Thank you."
         )
         
+        html_message = render_to_string('emails/invite_email.html', {
+            'role_display': 'Employee',
+            'company_name': company_name,
+            'invitation_link': invitation_link,
+        })
+        
         send_mail(
             subject,
             message,
             getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@tresta.com'),
             [email],
             fail_silently=False,
+            html_message=html_message,
         )
         
         RecentActivity.objects.create(activity_name=f"{request.user.get_role_display()} invited employee {email}.")

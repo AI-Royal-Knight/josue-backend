@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -129,12 +130,19 @@ class CompaniesView(APIView):
                 f'Thank you.'
             )
             
+            html_message = render_to_string('emails/invite_email.html', {
+                'role_display': 'Admin',
+                'company_name': company.company_name,
+                'invitation_link': invitation_link,
+            })
+            
             send_mail(
                 subject,
                 message,
                 settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
                 [admin_user.email],
                 fail_silently=False,
+                html_message=html_message,
             )
             
         RecentActivity.objects.create(activity_name=f"Super Admin invited {admin_user.email} as Admin for {company.company_name}.")
