@@ -5,9 +5,24 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      # Persist SQLite database across rebuilds
+      - db_data:/app/db.sqlite3
+      # Persist uploaded media files
+      - media_data:/app/media
+      # Hot-reload app code in development (comment out in production)
       - .:/app
-    # Uses your existing .env file for environment variables
+      # Keep the venv from being overwritten by the above bind mount
+      - /opt/venv
     env_file:
       - .env
-    command: python manage.py runserver 0.0.0.0:8000
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/schema/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  db_data:
+  media_data:

@@ -11,19 +11,22 @@ WORKDIR /app
 # Copy dependency files first to leverage Docker layer caching
 COPY pyproject.toml uv.lock ./
 
-# Set uv to create the virtual environment outside of /app to avoid being overwritten by volume mounts
+# Place the virtual environment outside /app so volume mounts don't overwrite it
 ENV UV_PROJECT_ENVIRONMENT="/opt/venv"
 
-# Sync dependencies to create a virtual environment inside /opt/venv
+# Sync all dependencies (including cloudinary, gunicorn, whitenoise)
 RUN uv sync --frozen --no-dev
 
 # Activate the virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy the rest of the application
+# Copy the application code
 COPY . .
+
+# Copy & make the entrypoint executable
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8000
 
-# Default command
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+ENTRYPOINT ["/entrypoint.sh"]
