@@ -14,11 +14,8 @@ COPY pyproject.toml uv.lock ./
 # Place the virtual environment outside /app so volume mounts don't overwrite it
 ENV UV_PROJECT_ENVIRONMENT="/opt/venv"
 
-# Sync all dependencies (including cloudinary, gunicorn, whitenoise)
+# Sync all dependencies using uv (cloudinary, gunicorn, whitenoise, etc.)
 RUN uv sync --frozen --no-dev
-
-# Activate the virtual environment
-ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy the application code
 COPY . .
