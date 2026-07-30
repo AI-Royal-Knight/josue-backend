@@ -206,7 +206,10 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     # This helps Swagger UI authorize requests using the Bearer token
-    'COMPONENT_SPLIT_REQUEST': True
+    'COMPONENT_SPLIT_REQUEST': True,
+    'ENUM_NAME_OVERRIDES': {
+        'StatusEnum': 'app.account.models.Company.Status',
+    }
 }
 
 LOGGING = {

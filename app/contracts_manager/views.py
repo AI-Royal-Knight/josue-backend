@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -13,6 +14,7 @@ class CMProjectListView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         role_assignment = RoleAssignment.objects.filter(
             user=request.user, 
@@ -33,6 +35,7 @@ class CMSubfolderUpdateView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def put(self, request, pk):
         try:
             subfolder = ProjectSubfolder.objects.get(pk=pk)

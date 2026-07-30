@@ -26,9 +26,13 @@ from datetime import timedelta
 
 import uuid
 
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+
 class Overview(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         data = DashboardService.get_super_admin_dashboard()
 
@@ -38,6 +42,7 @@ class Overview(APIView):
 class CompaniesView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         companies = Company.objects.prefetch_related(
             Prefetch(
@@ -67,6 +72,7 @@ class CompaniesView(APIView):
             "companies": serializer.data
         }, status=status.HTTP_200_OK)
 
+    @extend_schema(request=AdminInviteSerializer, responses={201: dict, 400: dict})
     def post(self, request):
         serializer = AdminInviteSerializer(
             data=request.data
@@ -163,6 +169,7 @@ class CompaniesView(APIView):
 class CompanyDetailView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(request=dict, responses={200: CompanyListSerializer})
     def patch(self, request, pk):
         try:
             company = Company.objects.get(pk=pk)
@@ -266,11 +273,10 @@ class CompanyDetailView(APIView):
         serializer = CompanyListSerializer(company)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-from drf_spectacular.utils import extend_schema
-
 class ValidateCompanyInvitationView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(responses={200: dict, 400: dict, 404: dict})
     def get(self, request, token):
         try:
             invitation = CompanyInvitation.objects.select_related('user', 'company').get(token=token, accepted=False)
@@ -328,6 +334,7 @@ class AcceptCompanyInvitationView(APIView):
 class MonthlyInvoiceView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         year_str = request.query_params.get("year")
         
@@ -357,6 +364,7 @@ class MonthlyInvoiceView(APIView):
         ]
         return Response(data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         company_id = request.data.get("company_id")
         year = request.data.get("year")
@@ -389,6 +397,7 @@ class MonthlyInvoiceView(APIView):
 class MonthlyInvoiceDetailView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(request=dict, responses={200: dict, 404: dict})
     def patch(self, request, pk):
         try:
             invoice = MonthlyInvoice.objects.get(pk=pk)

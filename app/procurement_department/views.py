@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 import os
 from rest_framework.views import APIView
 from rest_framework.views import APIView
@@ -21,6 +22,7 @@ from .serializers import (
 class SupplierListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         # Determine the company for the current user
         company = None
@@ -72,6 +74,7 @@ class SupplierListView(APIView):
 class SupplierInviteView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         role_assignment = RoleAssignment.objects.filter(user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT).first()
         if not role_assignment or not role_assignment.company:
@@ -159,6 +162,7 @@ class SupplierInviteView(APIView):
 class ProcurementProjectListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         if request.user.role == UserAccount.Role.ADMIN:
             projects = Project.objects.filter(company=request.user.company)
@@ -419,6 +423,7 @@ class ParsePOPDFView(APIView):
     """POST /procurement/po/parse-pdf/  → parse a supplier PDF and return structured data."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         uploaded = request.FILES.get("file")
         if not uploaded:
@@ -439,6 +444,7 @@ class GenerateBrandedPOPDFView(APIView):
     """POST /procurement/po/generate-pdf/  → create a branded PDF and return it as a download."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         import json
         from django.http import HttpResponse
@@ -491,11 +497,13 @@ class SupplierQuotationView(APIView):
     """
     permission_classes = [AllowAny]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, token):
         quotation = get_object_or_404(Quotation, supplier_token=token)
         serializer = QuotationSerializer(quotation)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
     def patch(self, request, token):
         quotation = get_object_or_404(Quotation, supplier_token=token)
         
@@ -604,6 +612,7 @@ class CallOffListViewSet(viewsets.GenericViewSet, viewsets.mixins.ListModelMixin
 class ApproveCallOffView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         from django.core.mail import EmailMessage
         from django.template.loader import render_to_string
@@ -680,6 +689,7 @@ class ApproveCallOffView(APIView):
 class ApproveAllCallOffsView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, po_ref):
         from django.core.mail import EmailMessage
         from django.template.loader import render_to_string

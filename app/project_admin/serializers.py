@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import Project
 from app.account.models import RoleAssignment, UserAccount
@@ -15,6 +16,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
     total_overspend = serializers.SerializerMethodField()
     is_user_clock_in_enabled = serializers.SerializerMethodField()
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_is_user_clock_in_enabled(self, obj):
         from app.project_admin.models import ApprovalConfiguration
         config = ApprovalConfiguration.objects.filter(
@@ -134,14 +136,17 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
         return total_unclaimed, total_overspend
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_total_unclaimed(self, obj):
         unclaimed, _ = self._calculate_subfolder_totals(obj)
         return unclaimed
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_total_overspend(self, obj):
         _, overspend = self._calculate_subfolder_totals(obj)
         return overspend
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_proforma_nr(self, obj):
         from app.project_admin.models import UserInvoice
         from django.db.models import Sum
@@ -152,6 +157,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
         )
         return proformas.aggregate(amt=Sum('total'))['amt'] or 0
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_total_po_raised(self, obj):
         from app.procurement_department.models import Quotation
         from django.db.models import Sum, Q

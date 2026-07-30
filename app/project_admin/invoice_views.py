@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 """
 User Invoice API views.
 - GET  /api/v1/invoices/user-invoices/          – list all invoices for the company (management) or only finance-approved ones
@@ -93,6 +94,7 @@ def _serialize_invoice(inv: UserInvoice) -> dict:
 class UserInvoiceListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         user = request.user
         
@@ -141,6 +143,7 @@ class UserInvoiceListView(APIView):
 class UserInvoiceApproveView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, invoice_id):
         user = request.user
         role = user.role
@@ -187,6 +190,7 @@ class UserInvoiceApproveView(APIView):
 class UserInvoicePayView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, invoice_id):
         if request.user.role != "finance_department":
             return Response(
@@ -234,6 +238,7 @@ class UserInvoicePayView(APIView):
 class UserInvoiceCommercialCommentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, invoice_id):
         if request.user.role != "commercial_department":
             return Response(
@@ -269,6 +274,7 @@ class UserInvoiceCommercialCommentView(APIView):
 class BucketListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         user = request.user
         qs = UserInvoice.objects.filter(status=UserInvoice.Status.BUCKET, created_by=user)
@@ -287,6 +293,7 @@ class BucketListView(APIView):
 class BucketSubmitView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         user = request.user
         invoice_ids = request.data.get("invoice_ids", [])

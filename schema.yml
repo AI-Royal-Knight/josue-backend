@@ -1,0 +1,5458 @@
+openapi: 3.0.3
+info:
+  title: Payparo API
+  version: 1.0.0
+paths:
+  /api/v1/account/change-password/:
+    post:
+      operationId: v1_account_change_password_create
+      description: Allows an authenticated user to change their password.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/forgot-password/:
+    post:
+      operationId: v1_account_forgot_password_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/invitations/accept/:
+    post:
+      operationId: v1_account_invitations_accept_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptInvitationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AcceptInvitationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AcceptInvitationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/invitations/send/:
+    post:
+      operationId: v1_account_invitations_send_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendInvitationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SendInvitationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SendInvitationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/invitations/validate/{token}/:
+    get:
+      operationId: v1_account_invitations_validate_retrieve
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/login/:
+    post:
+      operationId: v1_account_login_create
+      description: Authenticate with email + password; returns JWT pair.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/logout/:
+    post:
+      operationId: v1_account_logout_create
+      description: Blacklists the refresh token to logout.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/notifications/:
+    get:
+      operationId: v1_account_notifications_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/notifications/{id}/read/:
+    post:
+      operationId: v1_account_notifications_read_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/notifications/read-all/:
+    post:
+      operationId: v1_account_notifications_read_all_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/profile/:
+    get:
+      operationId: v1_account_profile_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: v1_account_profile_update
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/refresh/:
+    post:
+      operationId: v1_account_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/account/request-admin/:
+    post:
+      operationId: v1_account_request_admin_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/reset-password/:
+    post:
+      operationId: v1_account_reset_password_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/submit-application/:
+    post:
+      operationId: v1_account_submit_application_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitApplicationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubmitApplicationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubmitApplicationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/users/:
+    get:
+      operationId: v1_account_users_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_account_users_create
+      description: Used to toggle user approval.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/account/verify-otp/:
+    post:
+      operationId: v1_account_verify_otp_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOTPRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerifyOTPRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerifyOTPRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/admin/home/:
+    get:
+      operationId: v1_admin_home_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/admin/managing-directors/:
+    get:
+      operationId: v1_admin_managing_directors_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ManagingDirectorList'
+          description: ''
+    post:
+      operationId: v1_admin_managing_directors_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagingDirectorInviteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ManagingDirectorInviteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ManagingDirectorInviteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/admin/profile/:
+    get:
+      operationId: v1_admin_profile_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProfile'
+          description: ''
+    put:
+      operationId: v1_admin_profile_update
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProfileUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminProfileUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminProfileUpdateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProfile'
+          description: ''
+  /api/v1/admin/project-admins/:
+    get:
+      operationId: v1_admin_project_admins_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectAdminList'
+          description: ''
+    post:
+      operationId: v1_admin_project_admins_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectAdminInviteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectAdminInviteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectAdminInviteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/admin/projects/:
+    get:
+      operationId: v1_admin_projects_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminProject'
+          description: ''
+  /api/v1/commercial/monthly-applications/:
+    get:
+      operationId: v1_commercial_monthly_applications_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_commercial_monthly_applications_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/commercial/monthly-applications/{id}/:
+    patch:
+      operationId: v1_commercial_monthly_applications_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/commercial/variations/:
+    get:
+      operationId: v1_commercial_variations_retrieve
+      description: Return all variations the user has access to (filtered by their
+        company's projects / assigned projects).
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_commercial_variations_create
+      description: Create a new variation with line items.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/commercial/variations/{id}/approve/:
+    post:
+      operationId: v1_commercial_variations_approve_create
+      description: Approve or reject a variation.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/commercial/variations/{id}/assign/:
+    post:
+      operationId: v1_commercial_variations_assign_create
+      description: Assign users to a variation.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/commercial/variations/{id}/submit-to-client/:
+    post:
+      operationId: v1_commercial_variations_submit_to_client_create
+      description: Mark variation as submitted to client.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/commercial/variations/{id}/toggle-signature/:
+    post:
+      operationId: v1_commercial_variations_toggle_signature_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/commercial/white-card/:
+    get:
+      operationId: v1_commercial_white_card_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/contracts-manager/projects/:
+    get:
+      operationId: v1_contracts_manager_projects_retrieve
+      description: List all projects explicitly assigned to the user as a CONTRACTS_MANAGER,
+        MANAGERS, or SUPERVISOR.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/contracts-manager/subfolders/{id}/:
+    put:
+      operationId: v1_contracts_manager_subfolders_update
+      description: Update the rows (and targets) for a specific subfolder.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/document-controller/approve-employee/:
+    post:
+      operationId: v1_document_controller_approve_employee_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveEmployeeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ApproveEmployeeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ApproveEmployeeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/document-controller/invite-employee/:
+    post:
+      operationId: v1_document_controller_invite_employee_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteEmployeeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InviteEmployeeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InviteEmployeeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/assign-project/:
+    post:
+      operationId: v1_employee_assign_project_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/assigned-projects/:
+    get:
+      operationId: v1_employee_assigned_projects_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectList'
+          description: ''
+  /api/v1/employee/attendance/check-in/:
+    post:
+      operationId: v1_employee_attendance_check_in_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/attendance/check-out/:
+    post:
+      operationId: v1_employee_attendance_check_out_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/attendance/status/:
+    get:
+      operationId: v1_employee_attendance_status_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/available-projects/:
+    get:
+      operationId: v1_employee_available_projects_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectList'
+          description: ''
+  /api/v1/employee/company-employees/:
+    get:
+      operationId: v1_employee_company_employees_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/daily-register/:
+    get:
+      operationId: v1_employee_daily_register_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/history/:
+    get:
+      operationId: v1_employee_history_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/labour-target/submit/{assignment_id}/:
+    post:
+      operationId: v1_employee_labour_target_submit_create
+      description: |-
+        Allows an employee to submit their own labour target value if the management's
+        target is hidden.
+      parameters:
+      - in: path
+        name: assignment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/loading-clearing/submit/:
+    post:
+      operationId: v1_employee_loading_clearing_submit_create
+      description: |-
+        Submit a Loading & Clearing booking.
+        The employee must have an active LoadingClearingAccess for their current project.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/my-folders/:
+    get:
+      operationId: v1_employee_my_folders_retrieve
+      description: |-
+        Returns the folders and subfolders assigned to the currently authenticated employee
+        for their active (checked-in) project.
+
+        Folder-level assignment: if any subfolder in a folder is assigned to this user,
+        the full folder (with only their assigned subfolders) is returned.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/my-folders/{folder_id}/subfolders/:
+    get:
+      operationId: v1_employee_my_folders_subfolders_retrieve
+      description: |-
+        Returns all assigned subfolders for a specific project folder
+        for the current employee on their active project.
+      parameters:
+      - in: path
+        name: folder_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/my-folders/subfolder/{assignment_id}/tasks/:
+    get:
+      operationId: v1_employee_my_folders_subfolder_tasks_retrieve
+      description: |-
+        Returns the individual task rows for a specific subfolder assignment.
+        Each row represents a dedicated task with its sent_to_bucket status.
+      parameters:
+      - in: path
+        name: assignment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/my-folders/subfolder/{assignment_id}/tasks/submit/:
+    post:
+      operationId: v1_employee_my_folders_subfolder_tasks_submit_create
+      description: |-
+        Submits a single row/task from a subfolder to the bucket.
+        Each row is tracked individually via source_id = "assignment_id:row_index"
+      parameters:
+      - in: path
+        name: assignment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/operations/:
+    get:
+      operationId: v1_employee_operations_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/operations/{op_type}/{op_id}/complete/:
+    patch:
+      operationId: v1_employee_operations_complete_partial_update
+      parameters:
+      - in: path
+        name: op_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: op_type
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/operations/briefings/create/:
+    post:
+      operationId: v1_employee_operations_briefings_create_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/operations/rams/create/:
+    post:
+      operationId: v1_employee_operations_rams_create_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/operations/todos/create/:
+    post:
+      operationId: v1_employee_operations_todos_create_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/operations/toolbox-talks/create/:
+    post:
+      operationId: v1_employee_operations_toolbox_talks_create_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/proforma-nr/submit/:
+    post:
+      operationId: v1_employee_proforma_nr_submit_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/rfis/:
+    get:
+      operationId: v1_employee_rfis_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RFI'
+          description: ''
+  /api/v1/employee/rfis/create/:
+    post:
+      operationId: v1_employee_rfis_create_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/variations/:
+    get:
+      operationId: v1_employee_variations_retrieve
+      description: Get a list of Variations assigned to the employee for their active
+        project.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/employee/variations/submit/:
+    post:
+      operationId: v1_employee_variations_submit_create
+      description: |-
+        Submit an existing assigned Variation to the Bucket List.
+        The employee must be checked into a project.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/finance/supplier-invoices/:
+    get:
+      operationId: v1_finance_supplier_invoices_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FinanceSupplierInvoice'
+          description: ''
+  /api/v1/finance/supplier-invoices/{id}/:
+    get:
+      operationId: v1_finance_supplier_invoices_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinanceSupplierInvoice'
+          description: ''
+    patch:
+      operationId: v1_finance_supplier_invoices_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFinanceSupplierInvoiceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFinanceSupplierInvoiceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFinanceSupplierInvoiceRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinanceSupplierInvoice'
+          description: ''
+  /api/v1/procurement/call-offs/:
+    get:
+      operationId: v1_procurement_call_offs_list
+      description: |-
+        Handles Call Off List logic:
+        - GET list: returns QuotationLineItems for Approved Quotations
+        - PATCH: allows toggling management_approved
+        - POST (custom action): create a new OrderLineCallOff
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CallOffLineItem'
+          description: ''
+  /api/v1/procurement/call-offs-approve-all/{po_ref}/:
+    post:
+      operationId: v1_procurement_call_offs_approve_all_create
+      parameters:
+      - in: path
+        name: po_ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/procurement/call-offs-approve/{id}/:
+    post:
+      operationId: v1_procurement_call_offs_approve_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/procurement/call-offs/{id}/:
+    put:
+      operationId: v1_procurement_call_offs_update
+      description: |-
+        Handles Call Off List logic:
+        - GET list: returns QuotationLineItems for Approved Quotations
+        - PATCH: allows toggling management_approved
+        - POST (custom action): create a new OrderLineCallOff
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallOffLineItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CallOffLineItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CallOffLineItemRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallOffLineItem'
+          description: ''
+    patch:
+      operationId: v1_procurement_call_offs_partial_update
+      description: |-
+        Handles Call Off List logic:
+        - GET list: returns QuotationLineItems for Approved Quotations
+        - PATCH: allows toggling management_approved
+        - POST (custom action): create a new OrderLineCallOff
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCallOffLineItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCallOffLineItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCallOffLineItemRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallOffLineItem'
+          description: ''
+  /api/v1/procurement/call-offs/{id}/create_call_off/:
+    post:
+      operationId: v1_procurement_call_offs_create_call_off_create
+      description: |-
+        Handles Call Off List logic:
+        - GET list: returns QuotationLineItems for Approved Quotations
+        - PATCH: allows toggling management_approved
+        - POST (custom action): create a new OrderLineCallOff
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallOffLineItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CallOffLineItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CallOffLineItemRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallOffLineItem'
+          description: ''
+  /api/v1/procurement/po/generate-pdf/:
+    post:
+      operationId: v1_procurement_po_generate_pdf_create
+      description: POST /procurement/po/generate-pdf/  → create a branded PDF and
+        return it as a download.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/procurement/po/parse-pdf/:
+    post:
+      operationId: v1_procurement_po_parse_pdf_create
+      description: POST /procurement/po/parse-pdf/  → parse a supplier PDF and return
+        structured data.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/procurement/projects/:
+    get:
+      operationId: v1_procurement_projects_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/procurement/quotations/:
+    get:
+      operationId: v1_procurement_quotations_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Quotation'
+          description: ''
+    post:
+      operationId: v1_procurement_quotations_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+          description: ''
+  /api/v1/procurement/quotations/{id}/:
+    get:
+      operationId: v1_procurement_quotations_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+          description: ''
+    put:
+      operationId: v1_procurement_quotations_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+          description: ''
+    patch:
+      operationId: v1_procurement_quotations_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedQuotationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedQuotationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedQuotationRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+          description: ''
+    delete:
+      operationId: v1_procurement_quotations_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/procurement/quotations/{id}/approve/:
+    patch:
+      operationId: v1_procurement_quotations_approve_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedQuotationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedQuotationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedQuotationRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+          description: ''
+  /api/v1/procurement/quotations/{id}/request_requote/:
+    post:
+      operationId: v1_procurement_quotations_request_requote_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+          description: ''
+  /api/v1/procurement/quotations/{id}/toggle_signature/:
+    post:
+      operationId: v1_procurement_quotations_toggle_signature_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/QuotationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+          description: ''
+  /api/v1/procurement/supplier-quote/{token}/:
+    get:
+      operationId: v1_procurement_supplier_quote_retrieve
+      description: |-
+        GET /procurement/supplier-quote/<token>/ -> Returns quotation details
+        PATCH /procurement/supplier-quote/<token>/ -> Update supplier prices & upload quote PDF
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: v1_procurement_supplier_quote_partial_update
+      description: |-
+        GET /procurement/supplier-quote/<token>/ -> Returns quotation details
+        PATCH /procurement/supplier-quote/<token>/ -> Update supplier prices & upload quote PDF
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/procurement/suppliers/:
+    get:
+      operationId: v1_procurement_suppliers_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/procurement/suppliers/invite/:
+    post:
+      operationId: v1_procurement_suppliers_invite_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/bucket/:
+    get:
+      operationId: v1_project_admin_bucket_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/bucket/submit/:
+    post:
+      operationId: v1_project_admin_bucket_submit_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/my-projects/:
+    get:
+      operationId: v1_project_admin_my_projects_retrieve
+      description: |-
+        Returns projects visible to the currently authenticated user.
+        - admin / project_admin  → all projects belonging to their company
+        - all other roles        → only the projects they are directly assigned to
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/:
+    get:
+      operationId: v1_project_admin_projects_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectList'
+          description: ''
+    post:
+      operationId: v1_project_admin_projects_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectList'
+          description: ''
+  /api/v1/project-admin/projects/{id}/:
+    get:
+      operationId: v1_project_admin_projects_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectList'
+          description: ''
+    put:
+      operationId: v1_project_admin_projects_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectList'
+          description: ''
+    delete:
+      operationId: v1_project_admin_projects_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/{id}/approval-configs/:
+    get:
+      operationId: v1_project_admin_projects_approval_configs_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: v1_project_admin_projects_approval_configs_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/{id}/financial-breakdown/:
+    get:
+      operationId: v1_project_admin_projects_financial_breakdown_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/{id}/folders/:
+    get:
+      operationId: v1_project_admin_projects_folders_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_project_admin_projects_folders_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/{id}/folders/bulk-update/:
+    put:
+      operationId: v1_project_admin_projects_folders_bulk_update_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/{id}/loading-clearing-access/:
+    get:
+      operationId: v1_project_admin_projects_loading_clearing_access_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_project_admin_projects_loading_clearing_access_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/{id}/loading-clearing-access/{access_pk}/:
+    patch:
+      operationId: v1_project_admin_projects_loading_clearing_access_partial_update
+      parameters:
+      - in: path
+        name: access_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    delete:
+      operationId: v1_project_admin_projects_loading_clearing_access_destroy
+      parameters:
+      - in: path
+        name: access_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/{id}/proforma-access/:
+    get:
+      operationId: v1_project_admin_projects_proforma_access_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_project_admin_projects_proforma_access_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/{id}/proforma-access/{access_pk}/:
+    patch:
+      operationId: v1_project_admin_projects_proforma_access_partial_update
+      parameters:
+      - in: path
+        name: access_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    delete:
+      operationId: v1_project_admin_projects_proforma_access_destroy
+      parameters:
+      - in: path
+        name: access_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/projects/{id}/roles/:
+    get:
+      operationId: v1_project_admin_projects_roles_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_project_admin_projects_roles_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/rfis/:
+    get:
+      operationId: v1_project_admin_rfis_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_project_admin_rfis_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/rfis/{id}/assign-technical/:
+    patch:
+      operationId: v1_project_admin_rfis_assign_technical_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/rfis/{id}/close/:
+    patch:
+      operationId: v1_project_admin_rfis_close_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/rfis/{id}/messages/:
+    post:
+      operationId: v1_project_admin_rfis_messages_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/user-invoices/:
+    get:
+      operationId: v1_project_admin_user_invoices_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/user-invoices/{invoice_id}/approve/:
+    post:
+      operationId: v1_project_admin_user_invoices_approve_create
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/user-invoices/{invoice_id}/commercial-comment/:
+    post:
+      operationId: v1_project_admin_user_invoices_commercial_comment_create
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/user-invoices/{invoice_id}/pay/:
+    post:
+      operationId: v1_project_admin_user_invoices_pay_create
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/project-admin/users/:
+    get:
+      operationId: v1_project_admin_users_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/super-admin/companies/:
+    get:
+      operationId: v1_super_admin_companies_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_super_admin_companies_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminInviteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminInviteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminInviteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/super-admin/companies/{id}/:
+    patch:
+      operationId: v1_super_admin_companies_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyList'
+          description: ''
+  /api/v1/super-admin/invitations/accept/:
+    post:
+      operationId: v1_super_admin_invitations_accept_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptCompanyInvitationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AcceptCompanyInvitationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AcceptCompanyInvitationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/super-admin/invitations/validate/{token}/:
+    get:
+      operationId: v1_super_admin_invitations_validate_retrieve
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/super-admin/invite-admin/:
+    get:
+      operationId: v1_super_admin_invite_admin_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_super_admin_invite_admin_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminInviteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminInviteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminInviteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/super-admin/invoices/:
+    get:
+      operationId: v1_super_admin_invoices_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: v1_super_admin_invoices_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/super-admin/invoices/{id}/:
+    patch:
+      operationId: v1_super_admin_invoices_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/super-admin/overview/:
+    get:
+      operationId: v1_super_admin_overview_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+components:
+  schemas:
+    AcceptCompanyInvitationRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          format: uuid
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        confirm_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - confirm_password
+      - password
+      - token
+    AcceptInvitationRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          format: uuid
+        first_name:
+          type: string
+          minLength: 1
+        last_name:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        company_name:
+          type: string
+          minLength: 1
+        profession:
+          type: string
+          minLength: 1
+        cscs_card_no:
+          type: string
+          minLength: 1
+      required:
+      - first_name
+      - last_name
+      - password
+      - token
+    AdminInviteRequest:
+      type: object
+      properties:
+        company_name:
+          type: string
+          minLength: 1
+        first_name:
+          type: string
+          minLength: 1
+        last_name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+          minLength: 1
+        phone_number:
+          type: string
+          minLength: 1
+      required:
+      - company_name
+      - email
+      - first_name
+      - last_name
+      - phone_number
+    AdminProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Email address
+        backup_email:
+          type: string
+          format: email
+          nullable: true
+          title: Backup email address
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 80
+        last_name:
+          type: string
+          maxLength: 80
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
+        company:
+          allOf:
+          - $ref: '#/components/schemas/Company'
+          readOnly: true
+        profile_updated_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - company
+      - email
+      - first_name
+      - id
+      - last_name
+      - role
+    AdminProfileUpdateRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        backup_email:
+          type: string
+          format: email
+          nullable: true
+          title: Backup email address
+          maxLength: 254
+        company:
+          $ref: '#/components/schemas/CompanyUpdateRequest'
+      required:
+      - first_name
+      - last_name
+    AdminProject:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        project_name:
+          type: string
+          maxLength: 255
+      required:
+      - id
+      - project_name
+    ApproveEmployeeRequest:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        approved:
+          type: boolean
+      required:
+      - approved
+      - user_id
+    CallOffLineItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        description:
+          type: string
+          maxLength: 255
+        qty:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        per:
+          type: string
+          nullable: true
+          maxLength: 50
+        each:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        po_ref:
+          type: string
+          readOnly: true
+        project_name:
+          type: string
+          readOnly: true
+        main_folder_name:
+          type: string
+          readOnly: true
+        sub_folder_name:
+          type: string
+          readOnly: true
+        variation_ref:
+          type: string
+          readOnly: true
+        supplier_name:
+          type: string
+          readOnly: true
+        supplier_email:
+          type: string
+          readOnly: true
+        management_approved:
+          type: boolean
+        management_approved_date:
+          type: string
+          format: date
+          nullable: true
+        qty_remaining:
+          type: string
+          nullable: true
+          readOnly: true
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLineCallOff'
+          readOnly: true
+      required:
+      - description
+      - history
+      - id
+      - main_folder_name
+      - po_ref
+      - project_name
+      - qty_remaining
+      - sub_folder_name
+      - supplier_email
+      - supplier_name
+      - variation_ref
+    CallOffLineItemRequest:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 255
+        qty:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        per:
+          type: string
+          nullable: true
+          maxLength: 50
+        each:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        management_approved:
+          type: boolean
+        management_approved_date:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - description
+    ChangePasswordRequest:
+      type: object
+      properties:
+        old_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - new_password
+      - old_password
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        company_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        company_logo:
+          type: string
+          format: uri
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+          maxLength: 20
+        company_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        building_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        street:
+          type: string
+          nullable: true
+          maxLength: 255
+        postcode:
+          type: string
+          nullable: true
+          maxLength: 50
+        vat_number:
+          type: string
+          nullable: true
+          maxLength: 100
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        bank_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        bank_address:
+          type: string
+          nullable: true
+          maxLength: 500
+        sort_code:
+          type: string
+          nullable: true
+          maxLength: 50
+        account_number:
+          type: string
+          nullable: true
+          maxLength: 100
+        iban:
+          type: string
+          nullable: true
+          maxLength: 100
+        swift_bic:
+          type: string
+          nullable: true
+          maxLength: 50
+        attachment:
+          type: string
+          format: uri
+          nullable: true
+      required:
+      - id
+    CompanyList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        company_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        admin_name:
+          type: string
+          nullable: true
+          readOnly: true
+        admin_surname:
+          type: string
+          nullable: true
+          readOnly: true
+        admin_email:
+          type: string
+          format: email
+          nullable: true
+          readOnly: true
+        phone:
+          type: string
+          nullable: true
+          maxLength: 20
+        user:
+          type: integer
+          readOnly: true
+        projects:
+          type: integer
+          readOnly: true
+        activate:
+          type: boolean
+        monthly_subscription:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        per_user_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        auto_monthly_inv:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        invoices_count:
+          type: integer
+          readOnly: true
+        rfis_count:
+          type: integer
+          readOnly: true
+        storage_usage:
+          type: string
+          readOnly: true
+        uploaded_files_count:
+          type: integer
+          readOnly: true
+      required:
+      - admin_email
+      - admin_name
+      - admin_surname
+      - id
+      - invoices_count
+      - projects
+      - rfis_count
+      - storage_usage
+      - uploaded_files_count
+      - user
+    CompanyUpdateRequest:
+      type: object
+      properties:
+        company_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        phone:
+          type: string
+          nullable: true
+          maxLength: 20
+        company_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        building_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        street:
+          type: string
+          nullable: true
+          maxLength: 255
+        postcode:
+          type: string
+          nullable: true
+          maxLength: 50
+        vat_number:
+          type: string
+          nullable: true
+          maxLength: 100
+        bank_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        bank_address:
+          type: string
+          nullable: true
+          maxLength: 500
+        sort_code:
+          type: string
+          nullable: true
+          maxLength: 50
+        account_number:
+          type: string
+          nullable: true
+          maxLength: 100
+        iban:
+          type: string
+          nullable: true
+          maxLength: 100
+        swift_bic:
+          type: string
+          nullable: true
+          maxLength: 50
+        attachment:
+          type: string
+          format: binary
+          nullable: true
+    FinanceSupplierInvoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        quote_ref:
+          type: string
+          maxLength: 50
+        date_of_quote:
+          type: string
+          format: date
+          readOnly: true
+        project_name:
+          type: string
+          readOnly: true
+        user_name:
+          type: string
+          nullable: true
+          readOnly: true
+        sort_code:
+          type: string
+          nullable: true
+          readOnly: true
+        account_number:
+          type: string
+          nullable: true
+          readOnly: true
+        quote_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        paid:
+          type: boolean
+        paid_by_name:
+          type: string
+          nullable: true
+          readOnly: true
+        date_scheduled:
+          type: string
+          format: date
+          nullable: true
+        release_date:
+          type: string
+          format: date
+          nullable: true
+        finance_comments:
+          type: string
+          nullable: true
+        procurement_comments:
+          type: string
+          nullable: true
+        commercial_comments:
+          type: string
+          nullable: true
+        supplier_name:
+          type: string
+          nullable: true
+          readOnly: true
+        credit_limit:
+          type: string
+          nullable: true
+          readOnly: true
+        eom_payment_terms:
+          type: string
+          nullable: true
+          readOnly: true
+        month_credit_used:
+          type: string
+          nullable: true
+          readOnly: true
+        available_credit:
+          type: string
+          nullable: true
+          readOnly: true
+        previous_month:
+          type: string
+          nullable: true
+          readOnly: true
+        invoice_due_this_month:
+          type: string
+          nullable: true
+          readOnly: true
+      required:
+      - account_number
+      - available_credit
+      - credit_limit
+      - date_of_quote
+      - eom_payment_terms
+      - id
+      - invoice_due_this_month
+      - month_credit_used
+      - paid_by_name
+      - previous_month
+      - project_name
+      - quote_ref
+      - sort_code
+      - supplier_name
+      - user_name
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+      required:
+      - email
+    InviteEmployeeRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+        last_name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+          minLength: 1
+      required:
+      - email
+      - first_name
+      - last_name
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+      required:
+      - email
+      - password
+    ManagingDirectorInviteRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+        last_name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+          minLength: 1
+      required:
+      - email
+      - first_name
+      - last_name
+    ManagingDirectorList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        first_name:
+          type: string
+          maxLength: 80
+        last_name:
+          type: string
+          maxLength: 80
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        is_active:
+          type: boolean
+        date_joined:
+          type: string
+          format: date-time
+      required:
+      - email
+      - first_name
+      - id
+      - last_name
+    OrderLineCallOff:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        call_off_by_name:
+          type: string
+          readOnly: true
+        approve_by_name:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        call_off_ref:
+          type: string
+          readOnly: true
+        date:
+          type: string
+          format: date
+          readOnly: true
+        qty:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        expected_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        line_item:
+          type: string
+          format: uuid
+        called_off_by:
+          type: string
+          format: uuid
+          nullable: true
+        approved_by:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - approve_by_name
+      - call_off_by_name
+      - call_off_ref
+      - created_at
+      - date
+      - id
+      - line_item
+      - price
+      - qty
+      - updated_at
+    OrderLineCallOffRequest:
+      type: object
+      properties:
+        qty:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        expected_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        line_item:
+          type: string
+          format: uuid
+        called_off_by:
+          type: string
+          format: uuid
+          nullable: true
+        approved_by:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - line_item
+      - price
+      - qty
+    PatchedCallOffLineItemRequest:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 255
+        qty:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        per:
+          type: string
+          nullable: true
+          maxLength: 50
+        each:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        management_approved:
+          type: boolean
+        management_approved_date:
+          type: string
+          format: date
+          nullable: true
+    PatchedFinanceSupplierInvoiceRequest:
+      type: object
+      properties:
+        quote_ref:
+          type: string
+          minLength: 1
+          maxLength: 50
+        quote_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        paid:
+          type: boolean
+        date_scheduled:
+          type: string
+          format: date
+          nullable: true
+        release_date:
+          type: string
+          format: date
+          nullable: true
+        finance_comments:
+          type: string
+          nullable: true
+        procurement_comments:
+          type: string
+          nullable: true
+        commercial_comments:
+          type: string
+          nullable: true
+    PatchedQuotationRequest:
+      type: object
+      properties:
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuotationLineItemRequest'
+        variation_ref:
+          type: string
+          nullable: true
+          maxLength: 100
+        supplier_email:
+          type: string
+          nullable: true
+          maxLength: 255
+        quote_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        status:
+          $ref: '#/components/schemas/QuotationStatusEnum'
+        po_created:
+          type: boolean
+        date_po_created:
+          type: string
+          format: date
+          nullable: true
+        procurement_comments:
+          type: string
+          nullable: true
+        finance_comments:
+          type: string
+          nullable: true
+        commercial_comments:
+          type: string
+          nullable: true
+        quote_approval_reasons:
+          type: string
+          nullable: true
+        requote_comments:
+          type: string
+          nullable: true
+        paid:
+          type: boolean
+        date_scheduled:
+          type: string
+          format: date
+          nullable: true
+        release_date:
+          type: string
+          format: date
+          nullable: true
+        supplier_token:
+          type: string
+          nullable: true
+          maxLength: 100
+        supplier_quote_pdf:
+          type: string
+          format: binary
+          nullable: true
+        sig_procurement_department:
+          type: boolean
+        sig_procurement_department_date:
+          type: string
+          format: date
+          nullable: true
+        sig_contracts_manager:
+          type: boolean
+        sig_contracts_manager_date:
+          type: string
+          format: date
+          nullable: true
+        sig_project_director:
+          type: boolean
+        sig_project_director_date:
+          type: string
+          format: date
+          nullable: true
+        sig_managing_director:
+          type: boolean
+        sig_managing_director_date:
+          type: string
+          format: date
+          nullable: true
+        sig_commercial_department:
+          type: boolean
+        sig_commercial_department_date:
+          type: string
+          format: date
+          nullable: true
+        fully_approved:
+          type: boolean
+        project:
+          type: string
+          format: uuid
+        main_folder:
+          type: string
+          format: uuid
+          nullable: true
+        sub_folder:
+          type: string
+          format: uuid
+          nullable: true
+        supplier:
+          type: string
+          format: uuid
+        paid_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+    ProjectAdminInviteRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+        last_name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+          minLength: 1
+        project_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+      - email
+      - first_name
+      - last_name
+    ProjectAdminList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        first_name:
+          type: string
+          maxLength: 80
+        last_name:
+          type: string
+          maxLength: 80
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        is_active:
+          type: boolean
+        date_joined:
+          type: string
+          format: date-time
+      required:
+      - email
+      - first_name
+      - id
+      - last_name
+    ProjectCreateRequest:
+      type: object
+      properties:
+        project_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        job_code:
+          type: string
+          minLength: 1
+          maxLength: 100
+        vat_rate:
+          type: string
+          nullable: true
+          maxLength: 100
+        address:
+          type: string
+          nullable: true
+          maxLength: 500
+        project_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        material_estimate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        labour_estimate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        prelims_estimate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        completion_date:
+          type: string
+          format: date
+          nullable: true
+        is_completed:
+          type: boolean
+      required:
+      - job_code
+      - project_name
+    ProjectList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        project_name:
+          type: string
+          maxLength: 255
+        job_code:
+          type: string
+          maxLength: 100
+        vat_rate:
+          type: string
+          nullable: true
+          maxLength: 100
+        address:
+          type: string
+          nullable: true
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        project_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        material_estimate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        labour_estimate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        prelims_estimate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        estimate_profit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+          readOnly: true
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        completion_date:
+          type: string
+          format: date
+          nullable: true
+        is_overdue:
+          type: boolean
+          readOnly: true
+        is_completed:
+          type: boolean
+        total_po_raised:
+          type: string
+          nullable: true
+          readOnly: true
+        proforma_nr:
+          type: string
+          nullable: true
+          readOnly: true
+        total_unclaimed:
+          type: string
+          nullable: true
+          readOnly: true
+        total_overspend:
+          type: string
+          nullable: true
+          readOnly: true
+        is_user_clock_in_enabled:
+          type: string
+          nullable: true
+          readOnly: true
+      required:
+      - created_at
+      - estimate_profit
+      - id
+      - is_overdue
+      - is_user_clock_in_enabled
+      - job_code
+      - proforma_nr
+      - project_name
+      - total_overspend
+      - total_po_raised
+      - total_unclaimed
+    ProjectUpdateRequest:
+      type: object
+      properties:
+        project_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        job_code:
+          type: string
+          minLength: 1
+          maxLength: 100
+        vat_rate:
+          type: string
+          nullable: true
+          maxLength: 100
+        address:
+          type: string
+          nullable: true
+          maxLength: 500
+        project_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        material_estimate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        labour_estimate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        prelims_estimate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        completion_date:
+          type: string
+          format: date
+          nullable: true
+        is_completed:
+          type: boolean
+      required:
+      - job_code
+      - project_name
+    Quotation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuotationLineItem'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuotationHistory'
+          readOnly: true
+        project_name:
+          type: string
+          readOnly: true
+        supplier_name:
+          type: string
+          readOnly: true
+        main_folder_name:
+          type: string
+          readOnly: true
+        sub_folder_name:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        quote_ref:
+          type: string
+          readOnly: true
+        variation_ref:
+          type: string
+          nullable: true
+          maxLength: 100
+        supplier_email:
+          type: string
+          nullable: true
+          maxLength: 255
+        date_of_quote:
+          type: string
+          format: date
+          readOnly: true
+        quote_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        status:
+          $ref: '#/components/schemas/QuotationStatusEnum'
+        po_created:
+          type: boolean
+        date_po_created:
+          type: string
+          format: date
+          nullable: true
+        procurement_comments:
+          type: string
+          nullable: true
+        finance_comments:
+          type: string
+          nullable: true
+        commercial_comments:
+          type: string
+          nullable: true
+        quote_approval_reasons:
+          type: string
+          nullable: true
+        requote_comments:
+          type: string
+          nullable: true
+        paid:
+          type: boolean
+        date_scheduled:
+          type: string
+          format: date
+          nullable: true
+        release_date:
+          type: string
+          format: date
+          nullable: true
+        supplier_token:
+          type: string
+          nullable: true
+          maxLength: 100
+        supplier_quote_pdf:
+          type: string
+          format: uri
+          nullable: true
+        sig_procurement_department:
+          type: boolean
+        sig_procurement_department_date:
+          type: string
+          format: date
+          nullable: true
+        sig_contracts_manager:
+          type: boolean
+        sig_contracts_manager_date:
+          type: string
+          format: date
+          nullable: true
+        sig_project_director:
+          type: boolean
+        sig_project_director_date:
+          type: string
+          format: date
+          nullable: true
+        sig_managing_director:
+          type: boolean
+        sig_managing_director_date:
+          type: string
+          format: date
+          nullable: true
+        sig_commercial_department:
+          type: boolean
+        sig_commercial_department_date:
+          type: string
+          format: date
+          nullable: true
+        fully_approved:
+          type: boolean
+        project:
+          type: string
+          format: uuid
+        main_folder:
+          type: string
+          format: uuid
+          nullable: true
+        sub_folder:
+          type: string
+          format: uuid
+          nullable: true
+        supplier:
+          type: string
+          format: uuid
+        paid_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - created_at
+      - date_of_quote
+      - history
+      - id
+      - main_folder_name
+      - project
+      - project_name
+      - quote_ref
+      - sub_folder_name
+      - supplier
+      - supplier_name
+      - updated_at
+    QuotationHistory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        message:
+          type: string
+          nullable: true
+        previous_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        previous_pdf:
+          type: string
+          format: uri
+          nullable: true
+        previous_line_items: {}
+        date_recorded:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - date_recorded
+      - id
+    QuotationHistoryRequest:
+      type: object
+      properties:
+        message:
+          type: string
+          nullable: true
+        previous_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        previous_pdf:
+          type: string
+          format: binary
+          nullable: true
+        previous_line_items: {}
+    QuotationLineItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        description:
+          type: string
+          maxLength: 255
+        qty:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        discount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        per:
+          type: string
+          nullable: true
+          maxLength: 50
+        each:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        comments:
+          type: string
+          nullable: true
+        supplier_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+          nullable: true
+      required:
+      - description
+      - id
+    QuotationLineItemRequest:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 255
+        qty:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        discount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        per:
+          type: string
+          nullable: true
+          maxLength: 50
+        each:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        comments:
+          type: string
+          nullable: true
+        supplier_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+          nullable: true
+      required:
+      - description
+    QuotationRequest:
+      type: object
+      properties:
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuotationLineItemRequest'
+        variation_ref:
+          type: string
+          nullable: true
+          maxLength: 100
+        supplier_email:
+          type: string
+          nullable: true
+          maxLength: 255
+        quote_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,13}(?:\.\d{0,2})?$
+        status:
+          $ref: '#/components/schemas/QuotationStatusEnum'
+        po_created:
+          type: boolean
+        date_po_created:
+          type: string
+          format: date
+          nullable: true
+        procurement_comments:
+          type: string
+          nullable: true
+        finance_comments:
+          type: string
+          nullable: true
+        commercial_comments:
+          type: string
+          nullable: true
+        quote_approval_reasons:
+          type: string
+          nullable: true
+        requote_comments:
+          type: string
+          nullable: true
+        paid:
+          type: boolean
+        date_scheduled:
+          type: string
+          format: date
+          nullable: true
+        release_date:
+          type: string
+          format: date
+          nullable: true
+        supplier_token:
+          type: string
+          nullable: true
+          maxLength: 100
+        supplier_quote_pdf:
+          type: string
+          format: binary
+          nullable: true
+        sig_procurement_department:
+          type: boolean
+        sig_procurement_department_date:
+          type: string
+          format: date
+          nullable: true
+        sig_contracts_manager:
+          type: boolean
+        sig_contracts_manager_date:
+          type: string
+          format: date
+          nullable: true
+        sig_project_director:
+          type: boolean
+        sig_project_director_date:
+          type: string
+          format: date
+          nullable: true
+        sig_managing_director:
+          type: boolean
+        sig_managing_director_date:
+          type: string
+          format: date
+          nullable: true
+        sig_commercial_department:
+          type: boolean
+        sig_commercial_department_date:
+          type: string
+          format: date
+          nullable: true
+        fully_approved:
+          type: boolean
+        project:
+          type: string
+          format: uuid
+        main_folder:
+          type: string
+          format: uuid
+          nullable: true
+        sub_folder:
+          type: string
+          format: uuid
+          nullable: true
+        supplier:
+          type: string
+          format: uuid
+        paid_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - project
+      - supplier
+    QuotationStatusEnum:
+      enum:
+      - Pending
+      - Approved
+      - Rejected
+      type: string
+      description: |-
+        * `Pending` - Pending
+        * `Approved` - Approved
+        * `Rejected` - Rejected
+    RFI:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        rfi_number:
+          type: string
+          readOnly: true
+        description:
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/RFIStatusEnum'
+          readOnly: true
+        document_url:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        closed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_by_name:
+          type: string
+          nullable: true
+          readOnly: true
+      required:
+      - closed_at
+      - created_at
+      - created_by_name
+      - description
+      - id
+      - rfi_number
+      - status
+    RFIStatusEnum:
+      enum:
+      - OPEN
+      - CLOSED
+      type: string
+      description: |-
+        * `OPEN` - Open
+        * `CLOSED` - Closed
+    ResetPasswordRequest:
+      type: object
+      properties:
+        uid:
+          type: string
+        token:
+          type: string
+        email:
+          type: string
+          format: email
+        otp:
+          type: string
+          maxLength: 4
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - new_password
+    RoleEnum:
+      enum:
+      - super_admin
+      - admin
+      - project_admin
+      - managing_director
+      - project_director
+      - procurement_department
+      - commercial_department
+      - document_controller
+      - finance_department
+      - contracts_manager
+      - managers
+      - supervisor
+      - employee
+      - supplier
+      - technical_department
+      type: string
+      description: |-
+        * `super_admin` - Super Admin
+        * `admin` - Admin
+        * `project_admin` - Project Admin
+        * `managing_director` - Managing Director
+        * `project_director` - Project Director
+        * `procurement_department` - Procurement Department
+        * `commercial_department` - Commercial Department
+        * `document_controller` - Document Controller
+        * `finance_department` - Finance Department
+        * `contracts_manager` - Contracts Manager
+        * `managers` - Managers
+        * `supervisor` - Supervisor
+        * `employee` - Employee
+        * `supplier` - Supplier
+        * `technical_department` - Technical Department
+    SendInvitationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        role:
+          type: string
+          minLength: 1
+        secondary_role:
+          type: string
+          nullable: true
+        company_id:
+          type: integer
+        project_id:
+          type: integer
+      required:
+      - email
+      - role
+    StatusEnum:
+      enum:
+      - active
+      - suspended
+      type: string
+      description: |-
+        * `active` - Active
+        * `suspended` - Suspended
+    SubmitApplicationRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          minLength: 1
+        first_name:
+          type: string
+          minLength: 1
+        last_name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        categories:
+          type: string
+        ipaf:
+          type: string
+        ipaf_expiry:
+          type: string
+          format: date
+          nullable: true
+        pasma:
+          type: string
+        pasma_expiry:
+          type: string
+          format: date
+          nullable: true
+        smsts:
+          type: string
+        smsts_expiry:
+          type: string
+          format: date
+          nullable: true
+        cscs:
+          type: string
+        cscs_expiry:
+          type: string
+          format: date
+          nullable: true
+        company_name:
+          type: string
+          minLength: 1
+        company_house_number:
+          type: string
+        company_utr:
+          type: string
+        bank_name:
+          type: string
+          minLength: 1
+        account_name:
+          type: string
+          minLength: 1
+        bank_address:
+          type: string
+        account_number:
+          type: string
+          minLength: 1
+        sort_code:
+          type: string
+          minLength: 1
+        insurance_policy:
+          type: string
+        employer_liability:
+          type: string
+        building:
+          type: string
+          minLength: 1
+        town:
+          type: string
+        city:
+          type: string
+          minLength: 1
+        postcode:
+          type: string
+          minLength: 1
+        terms_accepted:
+          type: boolean
+        signature:
+          type: string
+          minLength: 1
+      required:
+      - account_name
+      - account_number
+      - bank_name
+      - building
+      - city
+      - company_name
+      - email
+      - first_name
+      - last_name
+      - password
+      - postcode
+      - role
+      - signature
+      - sort_code
+      - terms_accepted
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    VerifyOTPRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        otp:
+          type: string
+          minLength: 1
+          maxLength: 4
+      required:
+      - email
+      - otp
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

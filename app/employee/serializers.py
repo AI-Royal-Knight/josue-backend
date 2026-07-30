@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import RFI, RFIMessage, AttendanceLog, RAMS, DailyBriefing, ToolboxTalk, ToDoList
 from app.account.models import UserAccount
@@ -14,6 +15,7 @@ class RFISerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'rfi_number', 'status', 'created_at', 'closed_at', 'created_by_name']
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_created_by_name(self, obj):
         if obj.created_by:
             if obj.created_by.first_name or obj.created_by.last_name:
@@ -30,12 +32,15 @@ class RFIMessageSerializer(serializers.ModelSerializer):
         model = RFIMessage
         fields = ['id', 'author_name', 'author_role', 'text', 'attachments', 'created_at']
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_author_name(self, obj):
         return obj.author.full_name or obj.author.email.split('@')[0] if obj.author else "Unknown"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_author_role(self, obj):
         return dict(UserAccount.Role.choices).get(obj.author.role, obj.author.role) if obj.author else "Unknown"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_attachments(self, obj):
         if obj.document_url:
             filename = obj.document_url.split('/')[-1]
@@ -55,6 +60,7 @@ class DashboardRFISerializer(serializers.ModelSerializer):
             'created_by_name', 'messages', 'assigned_to_technical_department'
         ]
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_created_by_name(self, obj):
         return obj.created_by.full_name or obj.created_by.email.split('@')[0] if obj.created_by else "Unknown"
 
@@ -74,11 +80,13 @@ class DailyRegisterSerializer(serializers.ModelSerializer):
             'profession', 'management'
         ]
         
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_profession(self, obj):
         if hasattr(obj.user, 'profile') and obj.user.profile:
             return obj.user.profile.profession
         return None
         
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_management(self, obj):
         return dict(UserAccount.Role.choices).get(obj.user.role, obj.user.role) if obj.user else None
 

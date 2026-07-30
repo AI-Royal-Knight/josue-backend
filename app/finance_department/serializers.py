@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from django.db.models import Sum
 from app.procurement_department.models import Quotation
@@ -28,41 +29,49 @@ class FinanceSupplierInvoiceSerializer(serializers.ModelSerializer):
             'month_credit_used', 'available_credit', 'previous_month', 'invoice_due_this_month',
         )
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_supplier_name(self, obj):
         if obj.supplier and obj.supplier.supplier:
             return obj.supplier.supplier.company_name
         return None
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_user_name(self, obj):
         if obj.created_by:
             return obj.created_by.full_name or obj.created_by.email
         return None
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_paid_by_name(self, obj):
         if obj.paid_by:
             return obj.paid_by.full_name or obj.paid_by.email
         return None
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_sort_code(self, obj):
         if obj.supplier and obj.supplier.supplier:
             return obj.supplier.supplier.sort_code
         return None
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_account_number(self, obj):
         if obj.supplier and obj.supplier.supplier:
             return obj.supplier.supplier.account_number
         return None
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_credit_limit(self, obj):
         if obj.supplier:
             return float(obj.supplier.credit_limit or 0)
         return 0
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_eom_payment_terms(self, obj):
         if obj.supplier:
             return obj.supplier.eom_payment_terms
         return 30
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_month_credit_used(self, obj):
         if not obj.supplier:
             return 0
@@ -72,11 +81,13 @@ class FinanceSupplierInvoiceSerializer(serializers.ModelSerializer):
         ).aggregate(total=Sum('quote_total'))['total']
         return float(total or 0)
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_available_credit(self, obj):
         credit_limit = self.get_credit_limit(obj)
         used = self.get_month_credit_used(obj)
         return credit_limit - used
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_previous_month(self, obj):
         import datetime
         from django.utils import timezone
@@ -94,6 +105,7 @@ class FinanceSupplierInvoiceSerializer(serializers.ModelSerializer):
         ).aggregate(total=Sum('quote_total'))['total']
         return float(total or 0)
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_invoice_due_this_month(self, obj):
         import datetime
         from django.utils import timezone

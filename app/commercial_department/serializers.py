@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import Variation, VariationLine
 
@@ -12,6 +13,7 @@ class VariationLineSerializer(serializers.ModelSerializer):
             "labour", "labour_target", "material", "qty", "line_total",
         ]
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_line_total(self, obj):
         return float((obj.labour + obj.material) * obj.qty)
 
@@ -68,55 +70,70 @@ class VariationSerializer(serializers.ModelSerializer):
             "corresponding_notice_no", "client_qs_comment", "difference",
         ]
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_created_by_name(self, obj):
         if obj.created_by:
             return obj.created_by.full_name
         return ""
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_approved_by_name(self, obj):
         if obj.approved_by:
             return obj.approved_by.full_name
         return ""
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_evidence(self, obj):
         return obj.evidence_url if obj.evidence_url else "📄"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_workArea(self, obj):
         return ", ".join(filter(None, set(line.work_area for line in obj.lines.all())))
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_workSection(self, obj):
         return ", ".join(filter(None, set(line.work_section for line in obj.lines.all())))
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_labourCost(self, obj):
         total = sum(line.labour * line.qty for line in obj.lines.all())
         return f"£{total:.2f}"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_materialCost(self, obj):
         total = sum(line.material * line.qty for line in obj.lines.all())
         return f"£{total:.2f}"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_variationAmount(self, obj):
         total = sum((line.labour + line.material) * line.qty for line in obj.lines.all())
         return f"£{total:.2f}"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_percentClaimed(self, obj):
         return f"{obj.percent_claimed}%"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_amountClaimed(self, obj):
         return f"£{obj.amount_claimed:.2f}"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_signByClient(self, obj):
         return "Yes" if obj.signed_by_client else "No"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_clientCertifiedAmount(self, obj):
         return f"£{obj.client_certified_amount:.2f}"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_diffrenceAmount(self, obj):
         return f"£{obj.difference:.2f}"
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_paymentStatusNr(self, obj):
         return obj.corresponding_notice_no
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_claimGQComment(self, obj):
         return obj.client_qs_comment
 

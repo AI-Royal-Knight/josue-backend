@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import UserAccount, UserProfile, Company
 
@@ -42,6 +43,7 @@ class UserSerializer(serializers.ModelSerializer):
             'stats'
         ]
         
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_stats(self, obj):
         # Temporary mock stats for UI until further specification
         return {

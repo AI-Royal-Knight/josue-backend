@@ -48,6 +48,7 @@ def _first_error(serializer) -> str:
 class ProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         data = ProfileService.get_profile(
             request.user, context={"request": request}
@@ -55,6 +56,7 @@ class ProfileView(APIView):
 
         return Response(data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
     def put(self, request):
         user = request.user
         data = request.data
@@ -152,6 +154,7 @@ class LogoutView(APIView):
     """Blacklists the refresh token to logout."""
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         try:
             refresh_token = request.data.get("refresh")
@@ -315,6 +318,7 @@ class SendInvitationView(APIView):
 class ValidateInvitationView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, token):
         try:
             invitation = Invitation.objects.get(token=token, status=Invitation.Status.PENDING)
@@ -635,6 +639,7 @@ class SubmitApplicationView(APIView):
 class UsersListView(APIView):
     permission_classes = [permissions.AllowAny] # For demo purposes, realistically IsAuthenticated
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         users = UserAccount.objects.all().select_related('profile', 'company')
         
@@ -693,6 +698,7 @@ class UsersListView(APIView):
             
         return Response(result)
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         """Used to toggle user approval."""
         user_id = request.data.get("user_id")
@@ -735,6 +741,7 @@ class UsersListView(APIView):
 class NotificationListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         from .models import Notification
         from .serializers import NotificationSerializer
@@ -745,6 +752,7 @@ class NotificationListView(APIView):
 class NotificationMarkReadView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         from .models import Notification
         try:
@@ -758,6 +766,7 @@ class NotificationMarkReadView(APIView):
 class NotificationMarkAllReadView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         from .models import Notification
         Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
@@ -766,6 +775,7 @@ class NotificationMarkAllReadView(APIView):
 class RequestAdminView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         from .models import Company, UserAccount
         from app.super_admin.models import CompanyInvitation, RecentActivity

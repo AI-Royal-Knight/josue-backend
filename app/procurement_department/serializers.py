@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from app.account.models import CompanySupplier, SupplierProfile, UserAccount
 from app.procurement_department.models import Quotation, QuotationLineItem, QuotationHistory, OrderLineCallOff
@@ -61,6 +62,7 @@ class CallOffLineItemSerializer(serializers.ModelSerializer):
             'qty_remaining', 'history'
         )
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_qty_remaining(self, obj):
         called_off_qty = sum(c.qty for c in obj.call_offs.all())
         return obj.qty - called_off_qty

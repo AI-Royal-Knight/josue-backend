@@ -15,6 +15,7 @@ from drf_spectacular.utils import extend_schema
 class HomeView(APIView):
     permission_classes = [IsAdmin]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)

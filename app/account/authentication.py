@@ -19,3 +19,12 @@ class CustomJWTAuthentication(JWTAuthentication):
             user.role = user.active_role
             
         return result
+
+
+try:
+    from drf_spectacular.contrib.rest_framework_simplejwt import SimpleJWTScheme
+
+    class CustomJWTScheme(SimpleJWTScheme):
+        target_class = 'app.account.authentication.CustomJWTAuthentication'
+except ImportError:
+    pass

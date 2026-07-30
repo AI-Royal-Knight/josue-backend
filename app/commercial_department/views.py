@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
@@ -21,6 +22,7 @@ def check_project_access(user, project_id):
 class VariationListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         """Return all variations the user has access to (filtered by their company's projects / assigned projects)."""
         user = request.user
@@ -51,6 +53,7 @@ class VariationListCreateView(APIView):
         serializer = VariationSerializer(variations, many=True)
         return Response({"variations": serializer.data})
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         """Create a new variation with line items."""
         project_id = request.data.get("project_id")
@@ -155,6 +158,7 @@ class VariationListCreateView(APIView):
 class VariationApprovalView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         """Approve or reject a variation."""
         action = request.data.get("action")  # "approve" or "reject"
@@ -190,6 +194,7 @@ class VariationApprovalView(APIView):
 class VariationToggleSignatureView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         try:
             variation = Variation.objects.get(pk=pk)
@@ -233,6 +238,7 @@ class VariationToggleSignatureView(APIView):
 class VariationSubmitToClientView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         """Mark variation as submitted to client."""
         try:
@@ -255,6 +261,7 @@ class VariationSubmitToClientView(APIView):
 class VariationAssignUsersView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         """Assign users to a variation."""
         try:
@@ -286,6 +293,7 @@ import datetime
 class MonthlyApplicationListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         project_id = request.query_params.get("project_id")
         if not project_id:
@@ -353,6 +361,7 @@ class MonthlyApplicationListCreateView(APIView):
             "current_draft": current_draft
         })
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         project_id = request.data.get("project_id")
         if not project_id:
@@ -419,6 +428,7 @@ class MonthlyApplicationListCreateView(APIView):
 class WhiteCardView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         project_id = request.query_params.get("project_id")
         if not project_id:
@@ -449,6 +459,7 @@ class WhiteCardView(APIView):
 class MonthlyApplicationUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def patch(self, request, pk):
         try:
             app = MonthlyApplication.objects.get(pk=pk)

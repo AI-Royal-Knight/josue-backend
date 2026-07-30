@@ -44,6 +44,7 @@ class MyProjectsView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         user = request.user
         if user.role in ["admin", "project_admin"]:
@@ -118,6 +119,7 @@ class ProjectListCreateView(APIView):
 class ProjectFinancialBreakdownView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, pk):
         try:
             project = Project.objects.get(pk=pk)
@@ -429,6 +431,7 @@ class ProjectDetailView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(responses={200: dict})
     def delete(self, request, pk):
         if not request.user.company:
             return Response(
@@ -452,6 +455,7 @@ class ProjectDetailView(APIView):
 class CompanyUsersView(APIView):
     permission_classes = [IsAdminOrProjectAdminOrCompanyManager]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
@@ -493,6 +497,7 @@ class CompanyUsersView(APIView):
 class ProjectRoleAssignmentsView(APIView):
     permission_classes = [CanManageProjectRoles]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, pk):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
@@ -537,6 +542,7 @@ class ProjectRoleAssignmentsView(APIView):
 
         return Response(roles_data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
@@ -649,6 +655,7 @@ from .serializers import ProjectFolderSerializer
 class ProjectFoldersView(APIView):
     permission_classes = [CanManageProjectFolders]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, pk):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
@@ -662,6 +669,7 @@ class ProjectFoldersView(APIView):
         serializer = ProjectFolderSerializer(folders, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
@@ -702,6 +710,7 @@ class ProjectFoldersView(APIView):
 class ProjectFoldersBulkUpdateView(APIView):
     permission_classes = [CanManageProjectFolders]
 
+    @extend_schema(request=dict, responses={200: dict})
     def put(self, request, pk):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
@@ -824,6 +833,7 @@ class ProjectApprovalConfigurationsView(APIView):
             return [IsAuthenticated()]
         return [IsAdminOrProjectAdmin()]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, pk):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
@@ -837,6 +847,7 @@ class ProjectApprovalConfigurationsView(APIView):
         serializer = ApprovalConfigurationSerializer(configs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
     def put(self, request, pk):
         if not request.user.company:
             return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
@@ -880,6 +891,7 @@ from app.employee.serializers import DashboardRFISerializer, RFIMessageSerialize
 class DashboardRFIListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         user = request.user
         if user.role in ["admin", "project_admin", "super_admin"]:
@@ -895,6 +907,7 @@ class DashboardRFIListView(APIView):
         serializer = DashboardRFISerializer(rfis.order_by('-created_at'), many=True)
         return Response({"rfis": serializer.data}, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         user = request.user
         project_id = request.data.get('project_id')
@@ -941,6 +954,7 @@ class DashboardRFIListView(APIView):
 class RFICloseView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def patch(self, request, pk):
         try:
             rfi = RFI.objects.get(pk=pk)
@@ -956,6 +970,7 @@ class RFICloseView(APIView):
 class RFIMessageCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         try:
             rfi = RFI.objects.get(pk=pk)
@@ -986,6 +1001,7 @@ class RFIMessageCreateView(APIView):
 class RFIAssignTechnicalView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def patch(self, request, pk):
         user = request.user
         if user.role not in ["contracts_manager", "manager", "managers", "supervisor", "admin", "project_admin", "super_admin"]:
@@ -1010,6 +1026,7 @@ from .serializers import ProformaAccessSerializer
 class ProformaAccessListView(APIView):
     permission_classes = [CanManageProjectRoles]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, pk):
         if request.user.role in ["admin", "project_admin"]:
             if not request.user.company:
@@ -1025,6 +1042,7 @@ class ProformaAccessListView(APIView):
         serializer = ProformaAccessSerializer(accesses, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         if request.user.role in ["admin", "project_admin"]:
             if not request.user.company:
@@ -1059,6 +1077,7 @@ class ProformaAccessListView(APIView):
 class ProformaAccessDetailView(APIView):
     permission_classes = [CanManageProjectRoles]
 
+    @extend_schema(request=dict, responses={200: dict})
     def patch(self, request, pk, access_pk):
         if request.user.role in ["admin", "project_admin"]:
             if not request.user.company:
@@ -1083,6 +1102,7 @@ class ProformaAccessDetailView(APIView):
         serializer = ProformaAccessSerializer(access)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(responses={200: dict})
     def delete(self, request, pk, access_pk):
         if request.user.role in ["admin", "project_admin"]:
             if not request.user.company:
@@ -1108,6 +1128,7 @@ from .serializers import LoadingClearingAccessSerializer
 class LoadingClearingAccessListView(APIView):
     permission_classes = [CanManageProjectRoles]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, pk):
         if request.user.role in ["admin", "project_admin"]:
             if not request.user.company:
@@ -1123,6 +1144,7 @@ class LoadingClearingAccessListView(APIView):
         serializer = LoadingClearingAccessSerializer(accesses, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
         if request.user.role in ["admin", "project_admin"]:
             if not request.user.company:
@@ -1157,6 +1179,7 @@ class LoadingClearingAccessListView(APIView):
 class LoadingClearingAccessDetailView(APIView):
     permission_classes = [CanManageProjectRoles]
 
+    @extend_schema(request=dict, responses={200: dict})
     def patch(self, request, pk, access_pk):
         if request.user.role in ["admin", "project_admin"]:
             if not request.user.company:
@@ -1181,6 +1204,7 @@ class LoadingClearingAccessDetailView(APIView):
         serializer = LoadingClearingAccessSerializer(access)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(responses={200: dict})
     def delete(self, request, pk, access_pk):
         if request.user.role in ["admin", "project_admin"]:
             if not request.user.company:

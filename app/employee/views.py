@@ -38,6 +38,7 @@ class EmployeeAvailableProjectsView(APIView):
 class EmployeeAssignProjectView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
@@ -80,6 +81,7 @@ from app.commercial_department.models import Variation
 class AttendanceStatusView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
@@ -115,6 +117,7 @@ class AttendanceStatusView(APIView):
 class CheckInView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
@@ -162,6 +165,7 @@ class CheckInView(APIView):
 class CheckOutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
@@ -198,6 +202,7 @@ class MyFoldersView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
@@ -248,6 +253,7 @@ class MyFolderSubfoldersView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, folder_id):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
@@ -310,6 +316,7 @@ class SubmitLabourTargetView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, assignment_id):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
@@ -359,6 +366,7 @@ class SubfolderTasksView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request, assignment_id):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
@@ -432,6 +440,7 @@ class SubmitSubfolderTaskView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request, assignment_id):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
@@ -541,6 +550,7 @@ class RFIListView(APIView):
 class DailyRegister(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         user = request.user
         project_id = request.query_params.get('project_id')
@@ -562,6 +572,7 @@ class RFICreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         active_log = AttendanceLog.objects.filter(
             user=request.user,
@@ -607,6 +618,7 @@ from .serializers import RAMSSerializer, DailyBriefingSerializer, ToolboxTalkSer
 class OperationsListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         project_id = request.query_params.get('project_id')
         if not project_id:
@@ -632,6 +644,7 @@ class RAMSCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role not in ['managers', 'project_director', 'admin', 'super_admin']:
             return Response({"error": "Only managers can create operations."}, status=status.HTTP_403_FORBIDDEN)
@@ -677,6 +690,7 @@ class DailyBriefingCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role not in ['managers', 'project_director', 'admin', 'super_admin']:
             return Response({"error": "Only managers can create operations."}, status=status.HTTP_403_FORBIDDEN)
@@ -724,6 +738,7 @@ class ToolboxTalkCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role not in ['managers', 'project_director', 'admin', 'super_admin']:
             return Response({"error": "Only managers can create operations."}, status=status.HTTP_403_FORBIDDEN)
@@ -767,6 +782,7 @@ class OperationCompleteView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(request=dict, responses={200: dict})
     def patch(self, request, op_type, op_id):
         from django.utils import timezone
         
@@ -813,6 +829,7 @@ class OperationCompleteView(APIView):
 class ToDoCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role not in ['managers', 'project_director', 'admin', 'super_admin']:
             return Response({"error": "Only managers can create To Do items."}, status=status.HTTP_403_FORBIDDEN)
@@ -844,6 +861,7 @@ class ToDoCreateView(APIView):
 class CompanyEmployeeListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         if not request.user.company:
             return Response({"error": "User has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
@@ -865,6 +883,7 @@ class LoadingClearingSubmitView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can submit loading & clearing"}, status=status.HTTP_403_FORBIDDEN)
@@ -958,6 +977,7 @@ class EmployeeVariationsListView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can view assigned variations"}, status=status.HTTP_403_FORBIDDEN)
@@ -1027,6 +1047,7 @@ class VariationSubmitView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can submit variations"}, status=status.HTTP_403_FORBIDDEN)
@@ -1092,6 +1113,7 @@ class VariationSubmitView(APIView):
 class ProformaNRSubmitView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can submit Proforma NR."}, status=status.HTTP_403_FORBIDDEN)
@@ -1152,6 +1174,7 @@ class ProformaNRSubmitView(APIView):
 class EmployeeHistoryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         from app.project_admin.models import UserInvoice
         

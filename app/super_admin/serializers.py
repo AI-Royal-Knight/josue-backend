@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 from app.account.models import Company
 
 class AdminInviteSerializer(serializers.Serializer):
@@ -28,50 +29,59 @@ class CompanyListSerializer(serializers.ModelSerializer):
             'invoices_count', 'rfis_count', 'storage_usage', 'uploaded_files_count'
         ]
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_admin_name(self, obj):
         # Assumes admin_users is populated via Prefetch
         if hasattr(obj, 'admin_users') and obj.admin_users:
             return obj.admin_users[0].first_name
         return None
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_admin_surname(self, obj):
         if hasattr(obj, 'admin_users') and obj.admin_users:
             return obj.admin_users[0].last_name
         return None
 
+    @extend_schema_field(serializers.EmailField(allow_null=True))
     def get_admin_email(self, obj):
         if hasattr(obj, 'admin_users') and obj.admin_users:
             return obj.admin_users[0].email
         return None
 
+    @extend_schema_field(serializers.IntegerField())
     def get_user(self, obj):
         from app.account.models import UserAccount
         if obj.company_name:
             return UserAccount.objects.filter(company__company_name__iexact=obj.company_name.strip()).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
         return UserAccount.objects.filter(company=obj).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
 
+    @extend_schema_field(serializers.IntegerField())
     def get_projects(self, obj):
         from app.project_admin.models import Project
         if obj.company_name:
             return Project.objects.filter(company__company_name__iexact=obj.company_name.strip()).count()
         return Project.objects.filter(company=obj).count()
 
+    @extend_schema_field(serializers.IntegerField())
     def get_invoices_count(self, obj):
         from app.project_admin.models import UserInvoice
         if obj.company_name:
             return UserInvoice.objects.filter(project__company__company_name__iexact=obj.company_name.strip()).count()
         return UserInvoice.objects.filter(project__company=obj).count()
 
+    @extend_schema_field(serializers.IntegerField())
     def get_rfis_count(self, obj):
         from app.employee.models import RFI
         if obj.company_name:
             return RFI.objects.filter(project__company__company_name__iexact=obj.company_name.strip()).count()
         return RFI.objects.filter(project__company=obj).count()
 
+    @extend_schema_field(serializers.CharField())
     def get_storage_usage(self, obj):
         # TODO: Implement actual storage calculation if a centralized File model is added
         return "1.2 GB"
 
+    @extend_schema_field(serializers.IntegerField())
     def get_uploaded_files_count(self, obj):
         # TODO: Implement actual file count if a centralized File model is added
         return 42
