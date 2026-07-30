@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+# Ensure the SQLite data directory exists
+mkdir -p /app/sqlite_data
+
 echo "==> Running database migrations..."
 uv run python manage.py migrate --noinput
 

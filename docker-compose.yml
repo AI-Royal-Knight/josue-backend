@@ -5,13 +5,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Persist SQLite database across rebuilds
-      - db_data:/app/db.sqlite3
+      # Persist SQLite database — mount to a directory, not a file
+      - db_data:/app/sqlite_data
       # Persist uploaded media files
       - media_data:/app/media
-      # Hot-reload app code in development (comment out in production)
+      # Hot-reload app code (remove in production)
       - .:/app
-      # Keep the venv from being overwritten by the above bind mount
+      # Protect the venv from the bind mount above
       - /opt/venv
     env_file:
       - .env
