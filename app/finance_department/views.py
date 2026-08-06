@@ -13,6 +13,9 @@ class FinanceSupplierInvoiceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     pagination_class = None
     http_method_names = ['get', 'patch', 'head', 'options']
+    # Provide a base queryset so drf-spectacular can derive the id type (<int:id>).
+    # The actual filtering is done in get_queryset() at runtime.
+    queryset = Quotation.objects.none()
 
     def get_queryset(self):
         user = self.request.user

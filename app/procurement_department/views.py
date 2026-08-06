@@ -182,6 +182,9 @@ class QuotationViewSet(viewsets.ModelViewSet):
     serializer_class = QuotationSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None
+    # Provide a base queryset so drf-spectacular can derive the id type (<int:id>).
+    # The actual filtering is done in get_queryset() at runtime.
+    queryset = Quotation.objects.none()
 
     def get_queryset(self):
         if self.request.user.role == UserAccount.Role.ADMIN:
@@ -550,6 +553,9 @@ class CallOffListViewSet(viewsets.GenericViewSet, viewsets.mixins.ListModelMixin
     serializer_class = CallOffLineItemSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None
+    # Provide a base queryset so drf-spectacular can derive the id type (<int:id>).
+    # The actual filtering is done in get_queryset() at runtime.
+    queryset = Quotation.objects.none()
 
     def get_queryset(self):
         from .models import QuotationLineItem
