@@ -14,6 +14,9 @@ COPY pyproject.toml uv.lock ./
 # Place the virtual environment outside /app so volume mounts don't overwrite it
 ENV UV_PROJECT_ENVIRONMENT="/opt/venv"
 
+# Add venv to PATH so 'python' resolves to the venv Python (e.g. when docker exec-ing)
+ENV PATH="/opt/venv/bin:$PATH"
+
 # Sync all dependencies using uv (cloudinary, gunicorn, whitenoise, etc.)
 RUN uv sync --frozen --no-dev
 
