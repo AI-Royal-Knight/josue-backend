@@ -9,7 +9,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'employee_id', 'cscs_card_no', 'cscs_expiry_date', 'ipaf_certification', 'pasma_certification', 
             'sssts_smsts', 'profession', 'emergency_contact_name', 'emergency_contact_number',
             'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature',
-            'ni_number', 'utr', 'passport_number', 'passport_expiry_date', 'passport_document'
+            'ni_number', 'utr', 'passport_number', 'passport_expiry_date', 'passport_document',
+            'bank_name', 'bank_address', 'sort_code', 'account_number', 'iban', 'swift_bic'
         ]
 
 class CompanySerializer(serializers.ModelSerializer):

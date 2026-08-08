@@ -94,7 +94,8 @@ class ProfileView(APIView):
                 'cscs_card_no', 'cscs_expiry_date', 'ipaf_certification', 'pasma_certification',
                 'sssts_smsts', 'profession', 'emergency_contact_name', 'emergency_contact_number',
                 'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature',
-                'ni_number', 'utr', 'passport_number', 'passport_expiry_date'
+                'ni_number', 'utr', 'passport_number', 'passport_expiry_date',
+                'bank_name', 'bank_address', 'sort_code', 'account_number', 'iban', 'swift_bic'
             ]:
                 if field in profile_data:
                     val = profile_data[field]

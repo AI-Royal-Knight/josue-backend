@@ -451,6 +451,14 @@ class UserProfile(BaseModel):
     terms_accepted = models.BooleanField(default=False)
     digital_signature = models.CharField(max_length=255, blank=True, null=True)
 
+    # Bank Details
+    bank_name = models.CharField(max_length=255, blank=True, null=True)
+    bank_address = models.CharField(max_length=500, blank=True, null=True)
+    sort_code = models.CharField(max_length=50, blank=True, null=True)
+    account_number = models.CharField(max_length=100, blank=True, null=True)
+    iban = models.CharField(max_length=100, blank=True, null=True)
+    swift_bic = models.CharField(max_length=50, blank=True, null=True)
+
     class Meta:
         db_table = "user_profiles"
 
