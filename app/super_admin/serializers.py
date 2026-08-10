@@ -19,6 +19,7 @@ class CompanyListSerializer(serializers.ModelSerializer):
     rfis_count = serializers.SerializerMethodField()
     storage_usage = serializers.SerializerMethodField()
     uploaded_files_count = serializers.SerializerMethodField()
+    admin_is_active = serializers.SerializerMethodField()
 
     class Meta:
         model = Company
@@ -26,7 +27,8 @@ class CompanyListSerializer(serializers.ModelSerializer):
             'id', 'company_name', 'admin_name', 'admin_surname', 'admin_email',
             'phone', 'user', 'projects', 'activate', 'monthly_subscription',
             'per_user_rate', 'auto_monthly_inv', 'status',
-            'invoices_count', 'rfis_count', 'storage_usage', 'uploaded_files_count'
+            'invoices_count', 'rfis_count', 'storage_usage', 'uploaded_files_count',
+            'admin_is_active'
         ]
 
     @extend_schema_field(serializers.CharField(allow_null=True))
@@ -46,6 +48,12 @@ class CompanyListSerializer(serializers.ModelSerializer):
     def get_admin_email(self, obj):
         if hasattr(obj, 'admin_users') and obj.admin_users:
             return obj.admin_users[0].email
+        return None
+
+    @extend_schema_field(serializers.BooleanField(allow_null=True))
+    def get_admin_is_active(self, obj):
+        if hasattr(obj, 'admin_users') and obj.admin_users:
+            return obj.admin_users[0].is_active
         return None
 
     @extend_schema_field(serializers.IntegerField())

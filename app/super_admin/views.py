@@ -273,6 +273,62 @@ class CompanyDetailView(APIView):
         serializer = CompanyListSerializer(company)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+class ResendCompanyInvitationView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    @extend_schema(request=None, responses={200: dict, 404: dict, 400: dict})
+    def post(self, request, pk):
+        try:
+            company = Company.objects.get(pk=pk)
+        except Company.DoesNotExist:
+            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        admin_user = UserAccount.objects.filter(company=company, role=UserAccount.Role.ADMIN).first()
+        if not admin_user:
+            return Response({"error": "No admin user found for this company."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            invitation = CompanyInvitation.objects.get(company=company, user=admin_user, accepted=False)
+        except CompanyInvitation.DoesNotExist:
+            return Response({"error": "No pending invitation found for this company."}, status=status.HTTP_404_NOT_FOUND)
+        except CompanyInvitation.MultipleObjectsReturned:
+            invitation = CompanyInvitation.objects.filter(company=company, user=admin_user, accepted=False).first()
+
+        invitation.expires_at = timezone.now() + timedelta(days=7)
+        invitation.save()
+
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+        invitation_link = f"{frontend_url}/invitation/{invitation.token}"
+
+        subject = 'Invitation to join as Admin (Resent)'
+        message = (
+            f'Hello {admin_user.first_name},\n\n'
+            f'You have been invited as an Admin for {company.company_name}.\n'
+            f'Please use the following link to accept your invitation and set up your account:\n'
+            f'{invitation_link}\n\n'
+            f'This link will expire in 7 days.\n\n'
+            f'Thank you.'
+        )
+        
+        html_message = render_to_string('emails/invite_email.html', {
+            'role_display': 'Admin',
+            'company_name': company.company_name,
+            'invitation_link': invitation_link,
+        })
+        
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
+            [admin_user.email],
+            fail_silently=False,
+            html_message=html_message,
+        )
+        
+        RecentActivity.objects.create(activity_name=f"Super Admin resent invitation to {admin_user.email} for {company.company_name}.")
+
+        return Response({"message": "Invitation email resent successfully."}, status=status.HTTP_200_OK)
+
 class ValidateCompanyInvitationView(APIView):
     permission_classes = [permissions.AllowAny]
 
