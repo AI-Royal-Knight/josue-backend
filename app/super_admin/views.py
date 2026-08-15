@@ -1,3 +1,4 @@
+import threading
 from django.db import transaction
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
@@ -7,6 +8,25 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 
 from app.super_admin.services import DashboardService
+
+
+def send_mail_async(subject, message, from_email, recipient_list, html_message=None):
+    """Send email in a background thread to avoid blocking the HTTP worker."""
+    def _send():
+        try:
+            send_mail(
+                subject,
+                message,
+                from_email,
+                recipient_list,
+                fail_silently=True,
+                html_message=html_message,
+            )
+        except Exception:
+            pass  # Logged by Django's mail backend; silently skip to avoid crashing the thread
+
+    thread = threading.Thread(target=_send, daemon=True)
+    thread.start()
 
 from app.super_admin.serializers import (
     AdminInviteSerializer,
@@ -142,12 +162,11 @@ class CompaniesView(APIView):
                 'invitation_link': invitation_link,
             })
             
-            send_mail(
+            send_mail_async(
                 subject,
                 message,
                 settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
                 [admin_user.email],
-                fail_silently=False,
                 html_message=html_message,
             )
             
@@ -319,12 +338,11 @@ class ResendCompanyInvitationView(APIView):
             'invitation_link': invitation_link,
         })
         
-        send_mail(
+        send_mail_async(
             subject,
             message,
             settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
             [admin_user.email],
-            fail_silently=False,
             html_message=html_message,
         )
         
