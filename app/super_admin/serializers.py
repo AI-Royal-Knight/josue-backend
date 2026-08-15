@@ -26,7 +26,7 @@ class CompanyListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'company_name', 'admin_name', 'admin_surname', 'admin_email',
             'phone', 'user', 'projects', 'activate', 'monthly_subscription',
-            'per_user_rate', 'auto_monthly_inv', 'status',
+            'per_user_rate', 'auto_monthly_inv', 'auto_monthly_inv_date', 'status',
             'invoices_count', 'rfis_count', 'storage_usage', 'uploaded_files_count',
             'admin_is_active'
         ]

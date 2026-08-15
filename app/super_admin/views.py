@@ -259,6 +259,9 @@ class CompanyDetailView(APIView):
         if "auto_monthly_inv" in data:
             company.auto_monthly_inv = data["auto_monthly_inv"]
             
+        if "auto_monthly_inv_date" in data:
+            company.auto_monthly_inv_date = data["auto_monthly_inv_date"]
+            
         company.save()
 
         # Prefetch the users again if returning the full serialized object
