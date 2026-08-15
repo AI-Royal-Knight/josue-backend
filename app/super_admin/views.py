@@ -1,3 +1,4 @@
+import logging
 import threading
 from django.db import transaction
 from django.core.mail import send_mail
@@ -9,6 +10,8 @@ from rest_framework import status, permissions
 
 from app.super_admin.services import DashboardService
 
+logger = logging.getLogger(__name__)
+
 
 def send_mail_async(subject, message, from_email, recipient_list, html_message=None):
     """Send email in a background thread to avoid blocking the HTTP worker."""
@@ -19,11 +22,12 @@ def send_mail_async(subject, message, from_email, recipient_list, html_message=N
                 message,
                 from_email,
                 recipient_list,
-                fail_silently=True,
+                fail_silently=False,
                 html_message=html_message,
             )
-        except Exception:
-            pass  # Logged by Django's mail backend; silently skip to avoid crashing the thread
+            logger.info(f"Email sent successfully to {recipient_list}")
+        except Exception as e:
+            logger.error(f"Failed to send email to {recipient_list}: {e}", exc_info=True)
 
     thread = threading.Thread(target=_send, daemon=True)
     thread.start()
