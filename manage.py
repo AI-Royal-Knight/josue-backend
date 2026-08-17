@@ -14,7 +14,7 @@ def main():
     current_env = env('ENVIRONMENT', default='dev')
  
     if current_env == 'prod':
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.prod')
     else:
         os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.dev')
 
