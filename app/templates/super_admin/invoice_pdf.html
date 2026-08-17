@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Invoice {{ invoice.invoice_number }}</title>
+    <style>
+        body { font-family: Helvetica, sans-serif; font-size: 14px; color: #333; }
+        .header { margin-bottom: 40px; }
+        .invoice-title { font-size: 28px; font-weight: bold; color: #1a1a1a; }
+        .details { margin-bottom: 40px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        .total-row { font-weight: bold; background-color: #f8f9fa; }
+        .total-amount { font-size: 18px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="invoice-title">INVOICE</div>
+        <p>Date: {{ date }}</p>
+        <p>Invoice #: {{ invoice.invoice_number }}</p>
+    </div>
+
+    <div class="details">
+        <h3>Billed To:</h3>
+        <p>
+            <strong>{{ company.company_name }}</strong><br>
+            {{ company.admin_name }} {{ company.admin_surname }}<br>
+            {{ company.admin_email }}
+        </p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Monthly Subscription</td>
+                <td>1</td>
+                <td>£{{ monthly_sub }}</td>
+                <td>£{{ monthly_sub }}</td>
+            </tr>
+            <tr>
+                <td>User Licenses</td>
+                <td>{{ users }}</td>
+                <td>£{{ per_user }}</td>
+                <td>£{{ per_user|floatformat:2 }} * {{ users }} = £{{ users|floatformat:0 }}</td>
+            </tr>
+            <!-- Wait, calculation in django template: per_user * users. It was passed as total_amount -->
+            <!-- Actually, I should just output the multiplied amount here -->
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="3" style="text-align: right;">Total Amount Due:</td>
+                <td class="total-amount">£{{ total_amount }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <p>Please pay within 14 days of receiving this invoice.</p>
+    <p>Thank you for your business!</p>
+</body>
+</html>

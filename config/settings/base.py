@@ -59,6 +59,7 @@ INSTALLED_APPS += [
 
 # Third-party apps
 INSTALLED_APPS += [
+    'anymail',
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
@@ -250,14 +251,11 @@ LOGGING = {
 }
 
 # Email Configuration
-EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
-EMAIL_HOST = env('EMAIL_HOST', default='smtp.hostinger.com')
-EMAIL_PORT = env('EMAIL_PORT', cast=int, default=587)
-EMAIL_USE_TLS = env('EMAIL_USE_TLS', cast=bool, default=True)
-EMAIL_USE_SSL = env('EMAIL_USE_SSL', cast=bool, default=False)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='hello@payparo.tech')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='Ayon28@gmail.com')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@payparo.tech')
+ANYMAIL = {
+    "SENDINBLUE_API_KEY": env("BREVO_API_KEY", default=""),
+}
+EMAIL_BACKEND = "anymail.backends.sendinblue.EmailBackend"
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@blinkdeal.cc')
 
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
 
@@ -270,3 +268,21 @@ cloudinary.config(
   api_key = env('CLOUDINARY_API_KEY', default=''),
   api_secret = env('CLOUDINARY_API_SECRET', default='')
 )
+
+# Celery Configuration
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://redis:6379/0')
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='redis://redis:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'generate-monthly-invoices': {
+        'task': 'app.super_admin.tasks.generate_and_send_monthly_invoices',
+        # Run daily at 1:00 AM
+        'schedule': crontab(hour=1, minute=0),
+    },
+}
