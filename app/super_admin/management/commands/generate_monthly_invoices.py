@@ -22,7 +22,15 @@ class Command(BaseCommand):
             monthly_sub = company.monthly_subscription or Decimal("0.00")
             per_user = company.per_user_rate or Decimal("0.00")
             users = company.user or 0
-            
+
+            # Guard: do not invoice for months before the company was created
+            company_created = company.created_at
+            if (year, month) < (company_created.year, company_created.month):
+                self.stdout.write(self.style.WARNING(
+                    f'Skipping {company.company_name}: invoice month {month}/{year} is before company creation {company_created.month}/{company_created.year}'
+                ))
+                continue
+
             total_amount = monthly_sub + (per_user * users)
 
             invoice_number = f"INV-{year}{month:02d}-{str(company.id)[:4].upper()}"

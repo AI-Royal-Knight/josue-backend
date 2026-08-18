@@ -28,7 +28,7 @@ class CompanyListSerializer(serializers.ModelSerializer):
             'phone', 'user', 'projects', 'activate', 'monthly_subscription',
             'per_user_rate', 'auto_monthly_inv', 'auto_monthly_inv_date', 'status',
             'invoices_count', 'rfis_count', 'storage_usage', 'uploaded_files_count',
-            'admin_is_active'
+            'admin_is_active', 'created_at'
         ]
 
     @extend_schema_field(serializers.CharField(allow_null=True))

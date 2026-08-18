@@ -455,16 +455,36 @@ class MonthlyInvoiceView(APIView):
         if not all([company_id, year, month]):
             return Response({"error": "company_id, year, and month are required"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Validate the company exists
+        try:
+            company = Company.objects.get(pk=company_id)
+        except Company.DoesNotExist:
+            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Guard: do not allow invoicing for months before the company was created
+        company_created = company.created_at
+        try:
+            invoice_year = int(year)
+            invoice_month = int(month)
+        except (TypeError, ValueError):
+            return Response({"error": "year and month must be integers"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if (invoice_year, invoice_month) < (company_created.year, company_created.month):
+            return Response(
+                {"error": f"Cannot create an invoice for {invoice_month}/{invoice_year} — the company was only created in {company_created.month}/{company_created.year}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         invoice, created = MonthlyInvoice.objects.update_or_create(
             company_id=company_id,
-            year=year,
-            month=month,
+            year=invoice_year,
+            month=invoice_month,
             defaults={
                 "amount": amount,
                 "is_sent": True
             }
         )
-        
+
         return Response({
             "id": invoice.id,
             "company_id": invoice.company_id,

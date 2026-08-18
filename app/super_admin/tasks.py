@@ -27,17 +27,22 @@ def generate_and_send_monthly_invoices():
 
     for company in companies:
         target_date = company.auto_monthly_inv_date or 1
-        
+
         # If target date is greater than the last day of this month, we execute on the last day
         if target_date > last_day:
             target_date = last_day
-            
+
         if target_date == today_day:
+            # Guard: do not invoice for months before the company was created
+            company_created = company.created_at
+            if (year, month) < (company_created.year, company_created.month):
+                continue
+
             # Generate invoice
             monthly_sub = company.monthly_subscription or Decimal("0.00")
             per_user = company.per_user_rate or Decimal("0.00")
             users = company.user or 0
-            
+
             total_amount = monthly_sub + (per_user * users)
             invoice_number = f"INV-{year}{month:02d}-{str(company.id)[:4].upper()}"
 
