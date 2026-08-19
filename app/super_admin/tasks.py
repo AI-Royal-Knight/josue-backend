@@ -81,7 +81,21 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
 
                 if not pisa_status.err:
                     file_name = f"invoice_{invoice_number}.pdf"
-                    invoice.pdf_file.save(file_name, ContentFile(pdf_file.getvalue()))
+                    
+                    try:
+                        import cloudinary.uploader
+                        upload_result = cloudinary.uploader.upload(
+                            pdf_file.getvalue(),
+                            resource_type='auto',
+                            public_id=f"invoice_{invoice_number}",
+                            folder="josue_invoices"
+                        )
+                        invoice.pdf_file = upload_result.get('secure_url')
+                        invoice.save()
+                    except Exception as e:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.error(f"Failed to upload invoice to Cloudinary: {e}")
 
                     # Send Email
                     # Get the admin or first user of the company to send the invoice to

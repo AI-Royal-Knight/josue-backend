@@ -442,7 +442,8 @@ class MonthlyInvoiceView(APIView):
                 "year": inv.year,
                 "month": inv.month,
                 "amount": str(inv.amount) if inv.amount else None,
-                "is_sent": inv.is_sent
+                "is_sent": inv.is_sent,
+                "pdf_file": inv.pdf_file if inv.pdf_file else None,
             }
             for inv in invoices
         ]
