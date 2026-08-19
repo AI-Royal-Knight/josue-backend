@@ -1,18 +1,35 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="utf-8">
-</head>
-<body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-    <p>Hi {{ company.admin_name }},</p>
-    
-    <p>Please find attached your monthly invoice for <strong>{{ month_name }} {{ year }}</strong>.</p>
-    
-    <p>If you have any questions or concerns regarding this invoice, please don't hesitate to contact our support team.</p>
-    
-    <p>Thank you for using our services!</p>
-    
-    <p>Best regards,<br>
-    The Payparo Team</p>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px; margin: 0; color: #3f3f46;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <div style="background-color: #2563eb; padding: 30px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 1px;">YOUR MONTHLY INVOICE</h1>
+        </div>
+        <div style="padding: 40px 30px;">
+            <p style="margin-top: 0; font-size: 16px; line-height: 24px;">Hello <strong>{{ company.company_name }}</strong> Team,</p>
+            
+            <p style="font-size: 16px; line-height: 24px; color: #3f3f46;">
+                We have attached your monthly invoice for <strong>{{ month_name }} {{ year }}</strong> to this email.
+            </p>
+            
+            <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 20px; margin: 25px 0; border-radius: 0 6px 6px 0;">
+                <p style="margin: 0; font-size: 15px; color: #475569; line-height: 24px;">
+                    Please find the PDF document attached for a detailed breakdown of your subscription and user licenses for the billing period.
+                </p>
+            </div>
+            
+            <p style="font-size: 15px; line-height: 24px; color: #52525b; margin-top: 30px;">
+                If you have any questions or concerns regarding this invoice, please don't hesitate to contact our support team. We're always here to help.
+            </p>
+            
+            <p style="font-size: 16px; line-height: 24px; margin-bottom: 0; margin-top: 30px;">
+                Thank you for choosing Tresta,<br>
+                <strong style="color: #2563eb;">The Tresta Team</strong>
+            </p>
+        </div>
+        <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+            <p style="margin: 0; font-size: 12px; color: #94a3b8;">&copy; {{ year }} Tresta. All rights reserved.</p>
+        </div>
+    </div>
 </body>
 </html>
