@@ -15,7 +15,7 @@ def get_last_day_of_month(year, month):
     return calendar.monthrange(year, month)[1]
 
 @shared_task
-def generate_and_send_monthly_invoices():
+def generate_and_send_monthly_invoices(company_id=None, force=False):
     now = timezone.now()
     year = now.year
     month = now.month
@@ -23,7 +23,10 @@ def generate_and_send_monthly_invoices():
 
     last_day = get_last_day_of_month(year, month)
 
-    companies = Company.objects.filter(activate=True, auto_monthly_inv=True)
+    if company_id:
+        companies = Company.objects.filter(id=company_id)
+    else:
+        companies = Company.objects.filter(activate=True, auto_monthly_inv=True)
 
     for company in companies:
         target_date = company.auto_monthly_inv_date or 1
@@ -32,7 +35,7 @@ def generate_and_send_monthly_invoices():
         if target_date > last_day:
             target_date = last_day
 
-        if target_date == today_day:
+        if force or target_date == today_day:
             # Guard: do not invoice for months before the company was created
             company_created = company.created_at
             if (year, month) < (company_created.year, company_created.month):
