@@ -426,7 +426,7 @@ class MonthlyInvoiceView(APIView):
             # If no year is provided, return all invoices using the list serializer
             invoices = MonthlyInvoice.objects.all().order_by('-created_at')
             from .serializers import MonthlyInvoiceListSerializer
-            serializer = MonthlyInvoiceListSerializer(invoices, many=True)
+            serializer = MonthlyInvoiceListSerializer(invoices, many=True, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
         
         try:

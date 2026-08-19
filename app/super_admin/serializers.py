@@ -103,5 +103,5 @@ class MonthlyInvoiceListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MonthlyInvoice
-        fields = ['id', 'company_name', 'year', 'month', 'amount', 'is_sent', 'is_paid', 'payment_date', 'invoice_number', 'created_at']
+        fields = ['id', 'company_name', 'year', 'month', 'amount', 'is_sent', 'is_paid', 'payment_date', 'invoice_number', 'pdf_file', 'created_at']
 
