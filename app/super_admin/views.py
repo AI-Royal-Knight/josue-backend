@@ -478,15 +478,18 @@ class MonthlyInvoiceView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        invoice, created = MonthlyInvoice.objects.update_or_create(
+        from app.super_admin.tasks import generate_and_send_monthly_invoices
+        generate_and_send_monthly_invoices(
             company_id=company_id,
-            year=invoice_year,
-            month=invoice_month,
-            defaults={
-                "amount": amount,
-                "is_sent": True
-            }
+            force=True,
+            target_year=invoice_year,
+            target_month=invoice_month
         )
+
+        try:
+            invoice = MonthlyInvoice.objects.get(company_id=company_id, year=invoice_year, month=invoice_month)
+        except MonthlyInvoice.DoesNotExist:
+            return Response({"error": "Invoice generation failed (it might have already existed or was skipped)."}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({
             "id": invoice.id,

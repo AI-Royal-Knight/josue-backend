@@ -15,10 +15,10 @@ def get_last_day_of_month(year, month):
     return calendar.monthrange(year, month)[1]
 
 @shared_task
-def generate_and_send_monthly_invoices(company_id=None, force=False):
+def generate_and_send_monthly_invoices(company_id=None, force=False, target_year=None, target_month=None):
     now = timezone.now()
-    year = now.year
-    month = now.month
+    year = target_year if target_year else now.year
+    month = target_month if target_month else now.month
     today_day = now.day
 
     last_day = get_last_day_of_month(year, month)
@@ -70,6 +70,7 @@ def generate_and_send_monthly_invoices(company_id=None, force=False):
                     "monthly_sub": monthly_sub,
                     "per_user": per_user,
                     "users": users,
+                    "user_licenses_total": per_user * users,
                     "date": now.strftime("%B %d, %Y"),
                 })
                 
