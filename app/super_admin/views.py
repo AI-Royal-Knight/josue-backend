@@ -278,6 +278,9 @@ class CompanyDetailView(APIView):
             
         if "per_user_rate" in data:
             company.per_user_rate = data["per_user_rate"]
+
+        if "user" in data:
+            company.user = data["user"]
             
         if "auto_monthly_inv" in data:
             company.auto_monthly_inv = data["auto_monthly_inv"]

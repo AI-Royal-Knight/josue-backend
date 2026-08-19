@@ -13,7 +13,6 @@ class CompanyListSerializer(serializers.ModelSerializer):
     admin_name = serializers.SerializerMethodField()
     admin_surname = serializers.SerializerMethodField()
     admin_email = serializers.SerializerMethodField()
-    user = serializers.SerializerMethodField()
     projects = serializers.SerializerMethodField()
     invoices_count = serializers.SerializerMethodField()
     rfis_count = serializers.SerializerMethodField()
@@ -55,13 +54,6 @@ class CompanyListSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'admin_users') and obj.admin_users:
             return obj.admin_users[0].is_active
         return None
-
-    @extend_schema_field(serializers.IntegerField())
-    def get_user(self, obj):
-        from app.account.models import UserAccount
-        if obj.company_name:
-            return UserAccount.objects.filter(company__company_name__iexact=obj.company_name.strip()).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
-        return UserAccount.objects.filter(company=obj).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
 
     @extend_schema_field(serializers.IntegerField())
     def get_projects(self, obj):
