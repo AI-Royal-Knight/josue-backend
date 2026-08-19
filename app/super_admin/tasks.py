@@ -83,7 +83,15 @@ def generate_and_send_monthly_invoices(company_id=None, force=False):
                     invoice.pdf_file.save(file_name, ContentFile(pdf_file.getvalue()))
 
                     # Send Email
-                    recipient = company.admin_email
+                    # Get the admin or first user of the company to send the invoice to
+                    admin_user = company.users.filter(role="admin").first()
+                    recipient = admin_user.email if admin_user else None
+                    
+                    if not recipient:
+                        # Fallback to any user in the company
+                        any_user = company.users.first()
+                        recipient = any_user.email if any_user else None
+
                     if recipient:
                         email_html = render_to_string("super_admin/invoice_email.html", {
                             "company": company,
