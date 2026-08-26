@@ -126,8 +126,12 @@ DB_DIR.mkdir(exist_ok=True)
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': DB_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'josue',
+        'USER': 'ayon',
+        'PASSWORD': 'amiayon',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
