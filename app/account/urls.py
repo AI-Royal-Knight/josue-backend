@@ -4,6 +4,7 @@ from .views import (
     LoginView,
     LogoutView,
     SendInvitationView,
+    AllowedInviteRolesView,
     ValidateInvitationView,
     AcceptInvitationView,
     ForgotPasswordView,
@@ -31,6 +32,7 @@ urlpatterns = [
     
     # Invitations
     path('invitations/send/', SendInvitationView.as_view(), name='Send Invitation'),
+    path('invitations/allowed-roles/', AllowedInviteRolesView.as_view(), name='Allowed Invite Roles'),
     path('invitations/validate/<uuid:token>/', ValidateInvitationView.as_view(), name='Validate Invitation'),
     path('invitations/accept/', AcceptInvitationView.as_view(), name='Accept Invitation'),
 

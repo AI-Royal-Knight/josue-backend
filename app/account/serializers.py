@@ -65,6 +65,17 @@ class SendInvitationSerializer(serializers.Serializer):
     company_id = serializers.IntegerField(required=False)
     project_id = serializers.IntegerField(required=False)
 
+    # Roles that cannot be invited through this endpoint under any circumstances
+    BLOCKED_ROLES = {'super_admin'}
+
+    def validate_role(self, value):
+        valid_roles = {choice[0] for choice in UserAccount.Role.choices}
+        if value not in valid_roles:
+            raise serializers.ValidationError(f"'{value}' is not a valid role.")
+        if value in self.BLOCKED_ROLES:
+            raise serializers.ValidationError(f"The '{value}' role cannot be assigned via invitation.")
+        return value
+
 class AcceptInvitationSerializer(serializers.Serializer):
     token = serializers.UUIDField()
     first_name = serializers.CharField()

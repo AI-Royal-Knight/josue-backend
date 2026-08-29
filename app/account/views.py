@@ -199,11 +199,14 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if hasattr(user, 'profile') and not user.profile.is_approved:
-            return Response(
-                {"error": "Your account is pending approval by an administrator."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # Only employee (mobile app) users are blocked until the Document Controller approves them.
+        # Management roles don't require profile approval to log in.
+        if user.role == UserAccount.Role.EMPLOYEE:
+            if hasattr(user, 'profile') and not user.profile.is_approved:
+                return Response(
+                    {"error": "Your account is pending review by the Document Controller. You will be notified once approved."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         if getattr(user, 'company', None) and not user.company.activate:
             return Response(
@@ -256,19 +259,62 @@ class LoginView(APIView):
 class SendInvitationView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    # Maps each caller role → the set of roles they are allowed to invite
+    INVITE_PERMISSIONS = {
+        UserAccount.Role.SUPER_ADMIN: {
+            UserAccount.Role.ADMIN,
+        },
+        UserAccount.Role.ADMIN: {
+            UserAccount.Role.PROJECT_ADMIN,
+            UserAccount.Role.MANAGING_DIRECTOR,
+        },
+        UserAccount.Role.PROJECT_ADMIN: {
+            UserAccount.Role.PROJECT_DIRECTOR,
+            UserAccount.Role.CONTRACTS_MANAGER,
+            UserAccount.Role.MANAGERS,
+            UserAccount.Role.SUPERVISOR,
+            UserAccount.Role.DOCUMENT_CONTROLLER,
+            UserAccount.Role.PROCUREMENT_DEPARTMENT,
+            UserAccount.Role.COMMERCIAL_DEPARTMENT,
+            UserAccount.Role.FINANCE_DEPARTMENT,
+            UserAccount.Role.TECHNICAL_DEPARTMENT,
+            UserAccount.Role.EMPLOYEE,
+        },
+        # These management roles can only invite mobile-app (employee) users
+        UserAccount.Role.CONTRACTS_MANAGER: {UserAccount.Role.EMPLOYEE},
+        UserAccount.Role.MANAGERS: {UserAccount.Role.EMPLOYEE},
+        UserAccount.Role.PROJECT_DIRECTOR: {UserAccount.Role.EMPLOYEE},
+        UserAccount.Role.SUPERVISOR: {UserAccount.Role.EMPLOYEE},
+        UserAccount.Role.DOCUMENT_CONTROLLER: {UserAccount.Role.EMPLOYEE},
+        # Procurement can only invite suppliers
+        UserAccount.Role.PROCUREMENT_DEPARTMENT: {UserAccount.Role.SUPPLIER},
+    }
+
     @extend_schema(request=SendInvitationSerializer, responses={200: dict})
     def post(self, request):
         serializer = SendInvitationSerializer(data=request.data)
         if not serializer.is_valid():
             return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
-            
+
+        caller_role = request.user.role
         email = serializer.validated_data["email"]
         role = serializer.validated_data["role"]
-        
+
+        # ── Role-based invite permission check ───────────────────────────────
+        allowed_roles = self.INVITE_PERMISSIONS.get(caller_role, set())
+        if role not in allowed_roles:
+            return Response(
+                {"error": f"Your role ({caller_role}) is not permitted to invite users as '{role}'."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         # Check if user already exists
         if UserAccount.objects.filter(email=email).exists():
             return Response({"error": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
-            
+
+        # For employee invites, create them with is_active=False (pending document controller approval)
+        # For all other roles, is_active=True after they accept the invite
+
         # Create Invitation
         invitation = Invitation.objects.create(
             email=email,
@@ -276,16 +322,16 @@ class SendInvitationView(APIView):
             secondary_role=serializer.validated_data.get("secondary_role"),
             company=request.user.company,
             invited_by=request.user,
-            expires_at=timezone.now() + timezone.timedelta(days=7)
+            expires_at=timezone.now() + timezone.timedelta(days=7),
         )
-        
+
         # Send Email
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
         invitation_link = f"{frontend_url}/accept-invite/{invitation.token}"
-        
+
         role_display = dict(UserAccount.Role.choices).get(role, role)
         company_name = request.user.company.company_name if request.user.company else "our platform"
-        
+
         subject = f"Invitation to join as {role_display}"
         message = (
             f"Hello,\n\n"
@@ -295,13 +341,13 @@ class SendInvitationView(APIView):
             f"This link will expire in 7 days.\n\n"
             f"Thank you."
         )
-        
+
         html_message = render_to_string('emails/invite_email.html', {
             'role_display': role_display,
             'company_name': company_name,
             'invitation_link': invitation_link,
         })
-        
+
         send_mail(
             subject,
             message,
@@ -310,10 +356,30 @@ class SendInvitationView(APIView):
             fail_silently=False,
             html_message=html_message,
         )
-        
-        RecentActivity.objects.create(activity_name=f"{request.user.get_role_display()} invited {email} as {role_display}.")
-        
+
+        RecentActivity.objects.create(
+            activity_name=f"{request.user.get_role_display()} invited {email} as {role_display}."
+        )
+
         return Response({"success": True, "message": "Invitation sent successfully."})
+
+
+class AllowedInviteRolesView(APIView):
+    """Returns the list of roles the current user is permitted to invite."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(responses={200: dict})
+    def get(self, request):
+        caller_role = request.user.role
+        allowed = SendInvitationView.INVITE_PERMISSIONS.get(caller_role, set())
+        role_choices = dict(UserAccount.Role.choices)
+        return Response({
+            "allowed_roles": [
+                {"value": r, "label": role_choices.get(r, r)}
+                for r in allowed
+            ],
+            "caller_role": caller_role,
+        })
 
 
 class ValidateInvitationView(APIView):
@@ -353,7 +419,11 @@ class AcceptInvitationView(APIView):
             
         if invitation.is_expired():
             return Response({"error": "Invitation expired"}, status=status.HTTP_400_BAD_REQUEST)
-            
+
+        # Employee (mobile app) users stay inactive until document controller approves them
+        is_employee = invitation.role == UserAccount.Role.EMPLOYEE
+        is_active_on_accept = not is_employee
+
         # Create or update user
         user, created = UserAccount.objects.get_or_create(
             email=invitation.email,
@@ -363,13 +433,23 @@ class AcceptInvitationView(APIView):
                 'role': invitation.role,
                 'secondary_role': invitation.secondary_role,
                 'company': invitation.company,
-                'is_active': True,
+                'is_active': is_active_on_accept,
             }
         )
         if created:
             user.set_password(serializer.validated_data["password"])
             user.save()
-            
+
+        # Create UserProfile for employees so document controller can review & approve
+        if is_employee and created:
+            UserProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    'profession': 'employee',
+                    'is_approved': False,
+                }
+            )
+
         # Create role assignment
         RoleAssignment.objects.get_or_create(
             user=user,
@@ -388,10 +468,15 @@ class AcceptInvitationView(APIView):
         # Mark invitation as accepted
         invitation.status = Invitation.Status.ACCEPTED
         invitation.save()
+
+        if is_employee:
+            message = "Application submitted. Your account is pending review by the Document Controller."
+        else:
+            message = "Account activated successfully. You can now log in."
         
         RecentActivity.objects.create(activity_name=f"User {user.first_name} {user.last_name} accepted the {user.get_role_display()} invitation.")
         
-        return Response({"success": True})
+        return Response({"success": True, "message": message, "pending_approval": is_employee})
 
 
 class ForgotPasswordView(APIView):
@@ -638,22 +723,34 @@ class SubmitApplicationView(APIView):
 
 
 class UsersListView(APIView):
-    permission_classes = [permissions.AllowAny] # For demo purposes, realistically IsAuthenticated
+    permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(responses={200: dict})
     def get(self, request):
         users = UserAccount.objects.all().select_related('profile', 'company')
-        
-        if not request.user.is_authenticated:
-            users = users.none()
-        elif request.user.role == UserAccount.Role.SUPER_ADMIN:
-            pass  # Super admin sees all
-        elif request.user.role == UserAccount.Role.ADMIN:
+        caller_role = request.user.role
+
+        if caller_role == UserAccount.Role.SUPER_ADMIN:
+            pass  # Super admin sees everyone across all companies
+        elif caller_role == UserAccount.Role.ADMIN:
             if request.user.company and request.user.company.company_name:
                 users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role=UserAccount.Role.SUPER_ADMIN)
             else:
                 users = users.filter(company=request.user.company).exclude(role=UserAccount.Role.SUPER_ADMIN)
+        elif caller_role == UserAccount.Role.DOCUMENT_CONTROLLER:
+            # Document controllers only manage employee (mobile app) users — scoped to their company
+            if request.user.company and request.user.company.company_name:
+                users = users.filter(
+                    company__company_name__iexact=request.user.company.company_name,
+                    role=UserAccount.Role.EMPLOYEE
+                )
+            else:
+                users = users.filter(
+                    company=request.user.company,
+                    role=UserAccount.Role.EMPLOYEE
+                )
         else:
+            # All other management roles see their company users (excluding super admin and admin)
             if request.user.company and request.user.company.company_name:
                 users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
             else:
@@ -701,13 +798,47 @@ class UsersListView(APIView):
 
     @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
-        """Used to toggle user approval."""
+        """Used to toggle user approval.
+        
+        Rules:
+        - Only document_controller can approve/unapprove employee (mobile app) users.
+        - Only super_admin or admin can approve admin-level invitation users.
+        - No one else can use this endpoint.
+        """
+        if not request.user.is_authenticated:
+            return Response({"error": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+
         user_id = request.data.get("user_id")
         approved = request.data.get("approved")
 
         try:
             user = UserAccount.objects.get(id=user_id)
-            
+
+            # ── Enforce who can approve whom ─────────────────────────────────
+            caller_role = request.user.role
+
+            if user.role == UserAccount.Role.EMPLOYEE:
+                # Only document controllers can approve mobile app users
+                if caller_role != UserAccount.Role.DOCUMENT_CONTROLLER:
+                    return Response(
+                        {"error": "Only Document Controllers can approve employee (mobile app) users."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            elif user.role in [UserAccount.Role.ADMIN, UserAccount.Role.PROJECT_ADMIN]:
+                # Only super_admin or admin can approve admin-level users
+                if caller_role not in [UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN]:
+                    return Response(
+                        {"error": "Only Super Admins or Admins can approve admin-level users."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            else:
+                # For all other roles, only admin or super_admin can approve
+                if caller_role not in [UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN]:
+                    return Response(
+                        {"error": "You do not have permission to approve this user."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
             # Get or create UserProfile
             try:
                 profile = user.profile
@@ -716,15 +847,19 @@ class UsersListView(APIView):
                     user=user,
                     profession=user.role
                 )
-                
+
             profile.is_approved = approved
-            if approved and request.user.is_authenticated:
+            if approved:
                 profile.approved_by = request.user
             else:
                 profile.approved_by = None
             profile.save()
 
-            if approved and user.company:
+            # When approving an employee, also activate their account
+            if user.role == UserAccount.Role.EMPLOYEE:
+                user.is_active = approved
+                user.save()
+            elif approved and user.company:
                 user.company.activate = True
                 user.company.save()
             elif not approved and user.company:
@@ -732,9 +867,13 @@ class UsersListView(APIView):
                 user.company.save()
 
             action = "approved" if approved else "unapproved"
-            RecentActivity.objects.create(activity_name=f"User {user.email} was {action} by {request.user.get_role_display() if request.user.is_authenticated else 'System'}.")
+            RecentActivity.objects.create(
+                activity_name=f"User {user.email} was {action} by {request.user.get_role_display()}."
+            )
 
             return Response({"success": True})
+        except UserAccount.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 

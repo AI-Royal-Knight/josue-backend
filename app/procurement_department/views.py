@@ -76,57 +76,87 @@ class SupplierInviteView(APIView):
 
     @extend_schema(request=dict, responses={200: dict})
     def post(self, request):
-        role_assignment = RoleAssignment.objects.filter(user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT).first()
-        if not role_assignment or not role_assignment.company:
-            return Response({"detail": "User is not associated with a company as a procurement admin."}, status=status.HTTP_403_FORBIDDEN)
-            
-        company = role_assignment.company
-        
+        # Only procurement_department role can invite suppliers
+        if request.user.role != UserAccount.Role.PROCUREMENT_DEPARTMENT:
+            # Check if user has a procurement role assignment (multi-role user)
+            role_assignment = RoleAssignment.objects.filter(
+                user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT
+            ).first()
+            if not role_assignment:
+                return Response(
+                    {"detail": "Only Procurement Department users can invite suppliers."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            company = role_assignment.company
+        else:
+            # Get company from role assignment or user.company
+            role_assignment = RoleAssignment.objects.filter(
+                user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT
+            ).first()
+            if role_assignment and role_assignment.company:
+                company = role_assignment.company
+            else:
+                company = request.user.company
+
+        if not company:
+            return Response(
+                {"detail": "User is not associated with a company."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = InviteSupplierSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
             company_name = serializer.validated_data['company_name']
-            
-            # Check if user exists
+
+            # Check if user exists; if so, they may already be a supplier (multi-company scenario)
             user, created = UserAccount.objects.get_or_create(
                 email=email,
                 defaults={'role': UserAccount.Role.SUPPLIER, 'is_active': True}
             )
-            
-            # Ensure they have the supplier role
-            if user.role != UserAccount.Role.SUPPLIER:
-                # If they were another role, we don't necessarily override it, but for this context they are a supplier.
-                # Usually a supplier might have multiple roles, but the system assumes 'supplier' is the primary role for these users.
-                pass
+
+            # If existing user is not a supplier, reject — suppliers are a separate user type
+            if not created and user.role != UserAccount.Role.SUPPLIER:
+                return Response(
+                    {"detail": "This email is registered to a non-supplier user and cannot be invited as a supplier."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             # Create or get supplier profile
             supplier_profile, _ = SupplierProfile.objects.get_or_create(
                 user=user,
                 defaults={'company_name': company_name}
             )
-            
-            # Link supplier to company
+
+            # Link supplier to this company (multi-company: same supplier, multiple companies)
             company_supplier, created_cs = CompanySupplier.objects.get_or_create(
                 company=company,
                 supplier=supplier_profile,
                 defaults={'eom_payment_terms': 30, 'credit_limit': 0.00}
             )
-            
-            # Create Invitation
-            invitation, _ = Invitation.objects.get_or_create(
+
+            if not created_cs:
+                return Response(
+                    {"detail": "This supplier is already linked to your company."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Create Invitation record
+            Invitation.objects.get_or_create(
                 email=email,
                 role=UserAccount.Role.SUPPLIER,
                 company=company,
                 defaults={
                     'status': Invitation.Status.PENDING,
-                    'expires_at': timezone.now() + timezone.timedelta(days=7)
+                    'expires_at': timezone.now() + timezone.timedelta(days=7),
+                    'invited_by': request.user,
                 }
             )
 
             # Send email
             frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
             invitation_link = f"{frontend_url}/sign-up?email={email}&role=supplier"
-            
+
             subject = f"You have been invited by {company.company_name} as a Supplier"
             message = (
                 f"Hello,\n\n"
@@ -136,13 +166,13 @@ class SupplierInviteView(APIView):
                 f"This link will expire in 7 days.\n\n"
                 f"Thank you."
             )
-            
+
             html_message = render_to_string('emails/invite_email.html', {
                 'role_display': 'Supplier',
                 'company_name': company.company_name,
                 'invitation_link': invitation_link,
             })
-            
+
             send_mail(
                 subject,
                 message,
@@ -154,12 +184,14 @@ class SupplierInviteView(APIView):
 
             return Response({
                 "detail": "Supplier invited successfully.",
-                "supplier": CompanySupplierSerializer(company_supplier).data
+                "supplier": CompanySupplierSerializer(company_supplier).data,
+                "is_new_supplier": created,
             }, status=status.HTTP_201_CREATED)
-            
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ProcurementProjectListView(APIView):
+
     permission_classes = [IsAuthenticated]
 
     @extend_schema(responses={200: dict})
