@@ -15,6 +15,7 @@ from drf_spectacular.utils import extend_schema
 
 from app.account.service import ProfileService
 from app.super_admin.models import RecentActivity
+from core.utils import get_frontend_url, get_default_from_email
 
 from .serializers import (
     LoginSerializer,
@@ -326,7 +327,7 @@ class SendInvitationView(APIView):
         )
 
         # Send Email
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+        frontend_url = get_frontend_url(request)
         invitation_link = f"{frontend_url}/accept-invite/{invitation.token}"
 
         role_display = dict(UserAccount.Role.choices).get(role, role)
@@ -351,7 +352,7 @@ class SendInvitationView(APIView):
         send_mail(
             subject,
             message,
-            getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@tresta.com'),
+            get_default_from_email(),
             [email],
             fail_silently=False,
             html_message=html_message,
@@ -500,7 +501,7 @@ class ForgotPasswordView(APIView):
             otp = f"{random.randint(0, 9999):04d}"
             cache.set(f"password_reset_otp_{user.email}", otp, timeout=900)
             
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+            frontend_url = get_frontend_url(request)
             reset_link = f"{frontend_url}/reset-password?uid={uid}&token={token}"
             
             subject = "Reset Your Password - Tresta"
@@ -518,7 +519,7 @@ class ForgotPasswordView(APIView):
             <!DOCTYPE html>
             <html>
             <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px; margin: 0; color: #3f3f46;">
-                <div style="max-w-[600px] margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
                     <div style="background-color: #2563eb; padding: 30px; text-align: center;">
                         <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 1px;">PASSWORD RESET</h1>
                     </div>
@@ -532,9 +533,14 @@ class ForgotPasswordView(APIView):
                         </div>
                         
                         <p style="font-size: 16px; line-height: 24px; margin-top: 30px;">Or, click the button below to set a new password:</p>
-                        <div style="text-align: center; margin: 20px 0 35px 0;">
+                        <div style="text-align: center; margin: 20px 0 25px 0;">
                             <a href="{reset_link}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 16px;">Reset Password</a>
                         </div>
+                        
+                        <p style="font-size: 13px; color: #94a3b8; word-break: break-all; text-align: center; margin-bottom: 25px;">
+                            If the button above does not work, visit:<br>
+                            <a href="{reset_link}" style="color: #2563eb;">{reset_link}</a>
+                        </p>
                         
                         <p style="font-size: 14px; line-height: 22px; color: #71717a; margin-bottom: 0;">If you did not request a password reset, you can safely ignore this email. Your account is secure.</p>
                     </div>
@@ -549,7 +555,7 @@ class ForgotPasswordView(APIView):
             send_mail(
                 subject,
                 message,
-                getattr(settings, 'DEFAULT_FROM_EMAIL', 'info@tresta.cloud'),
+                get_default_from_email(),
                 [user.email],
                 fail_silently=True,
                 html_message=html_message,

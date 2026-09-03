@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
+from core.utils import get_frontend_url, get_default_from_email
 
 from app.account.models import CompanySupplier, SupplierProfile, UserAccount, Invitation, RoleAssignment
 from app.project_admin.models import Project
@@ -142,7 +143,7 @@ class SupplierInviteView(APIView):
                 )
 
             # Create Invitation record
-            Invitation.objects.get_or_create(
+            invitation, _ = Invitation.objects.get_or_create(
                 email=email,
                 role=UserAccount.Role.SUPPLIER,
                 company=company,
@@ -154,8 +155,8 @@ class SupplierInviteView(APIView):
             )
 
             # Send email
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-            invitation_link = f"{frontend_url}/sign-up?email={email}&role=supplier"
+            frontend_url = get_frontend_url(request)
+            invitation_link = f"{frontend_url}/accept-invite/{invitation.token}"
 
             subject = f"You have been invited by {company.company_name} as a Supplier"
             message = (
@@ -176,7 +177,7 @@ class SupplierInviteView(APIView):
             send_mail(
                 subject,
                 message,
-                getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@payparo.tech'),
+                get_default_from_email(),
                 [email],
                 fail_silently=False,
                 html_message=html_message,
@@ -322,7 +323,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 email_to = quotation.supplier.supplier.user.email
                 
             if email_to:
-                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+                frontend_url = get_frontend_url(getattr(self, 'request', None))
                 supplier_link = f"{frontend_url}/supplier-quote/{quotation.supplier_token}"
                 
                 subject = f"Request for Quotation: {quotation.quote_ref}"
@@ -337,7 +338,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 email = EmailMessage(
                     subject,
                     message,
-                    getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@payparo.tech'),
+                    get_default_from_email(),
                     [email_to]
                 )
                 email.attach(f"Quotation_{quotation.quote_ref}.pdf", pdf_bytes, "application/pdf")
@@ -429,7 +430,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
             email_to = quotation.supplier.supplier.user.email
             
         if email_to:
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+            frontend_url = get_frontend_url(request)
             supplier_link = f"{frontend_url}/supplier-quote/{quotation.supplier_token}"
             
             subject = f"Re-quote Requested: {quotation.quote_ref}"
@@ -445,7 +446,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
             send_mail(
                 subject,
                 message,
-                getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@payparo.tech'),
+                get_default_from_email(),
                 [email_to],
                 fail_silently=True,
             )

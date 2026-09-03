@@ -4,6 +4,7 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from rest_framework.response import Response
 from rest_framework import status
+from core.utils import get_frontend_url, get_default_from_email
 
 from app.account.permissions import IsAdmin
 from app.account.models import UserAccount
@@ -130,7 +131,7 @@ class ProjectAdminsView(APIView):
                 expires_at=timezone.now() + timedelta(days=7),
             )
 
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+            frontend_url = get_frontend_url(request)
             invitation_link = f"{frontend_url}/invitation/{invitation.token}"
             
             subject = 'Invitation to join as Project Admin'
@@ -152,7 +153,7 @@ class ProjectAdminsView(APIView):
             send_mail(
                 subject,
                 message,
-                settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
+                get_default_from_email(),
                 [project_admin_user.email],
                 fail_silently=False,
                 html_message=html_message,
@@ -238,7 +239,7 @@ class ManagingDirectorsView(APIView):
                 expires_at=timezone.now() + timedelta(days=7),
             )
 
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+            frontend_url = get_frontend_url(request)
             invitation_link = f"{frontend_url}/invitation/{invitation.token}"
             
             subject = 'Invitation to join as Managing Director'
@@ -260,7 +261,7 @@ class ManagingDirectorsView(APIView):
             send_mail(
                 subject,
                 message,
-                settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
+                get_default_from_email(),
                 [md_user.email],
                 fail_silently=False,
                 html_message=html_message,

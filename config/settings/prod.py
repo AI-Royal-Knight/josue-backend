@@ -3,7 +3,8 @@ from .base import env
 
 DEBUG = False
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['tresta.cloud', 'www.tresta.cloud', 'api.tresta.cloud', 'localhost', '127.0.0.1'])
+FRONTEND_URL = env('FRONTEND_URL', default='https://tresta.cloud')
 
 # Trust the X-Forwarded-Proto header from Nginx
 # This matches the "proxy_set_header X-Forwarded-Proto $scheme;"

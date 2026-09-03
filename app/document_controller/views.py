@@ -9,6 +9,7 @@ from drf_spectacular.utils import extend_schema
 
 from app.account.models import UserAccount, Invitation
 from app.super_admin.models import RecentActivity
+from core.utils import get_frontend_url, get_default_from_email
 from .serializers import InviteEmployeeSerializer, ApproveEmployeeSerializer
 
 def _first_error(serializer) -> str:
@@ -47,7 +48,7 @@ class InviteEmployeeView(APIView):
             expires_at=timezone.now() + timezone.timedelta(days=7)
         )
         
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+        frontend_url = get_frontend_url(request)
         invitation_link = f"{frontend_url}/accept-invite/{invitation.token}"
         
         company_name = request.user.company.company_name if request.user.company else "our platform"
@@ -71,7 +72,7 @@ class InviteEmployeeView(APIView):
         send_mail(
             subject,
             message,
-            getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@tresta.com'),
+            get_default_from_email(),
             [email],
             fail_silently=False,
             html_message=html_message,

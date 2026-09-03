@@ -79,13 +79,23 @@ MIDDLEWARE = [
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-CORS_ALLOWED_ORIGINS = [
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
+    "https://tresta.cloud",
+    "https://www.tresta.cloud",
+    "https://api.tresta.cloud",
     "https://josue.tripmate.cloud",
-]
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+])
 
-CSRF_TRUSTED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
+    "https://tresta.cloud",
+    "https://www.tresta.cloud",
+    "https://api.tresta.cloud",
     "https://josue.tripmate.cloud",
-]
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+])
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = (
@@ -205,7 +215,7 @@ SIMPLE_JWT = {
 
 # DRF_SPECTACULAR SETTINGS
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Payparo API',
+    'TITLE': 'Tresta API',
     'DESCRIPTION': '',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
@@ -257,7 +267,7 @@ ANYMAIL = {
 EMAIL_BACKEND = "anymail.backends.sendinblue.EmailBackend"
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@blinkdeal.cc')
 
-FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
+FRONTEND_URL = env('FRONTEND_URL', default='https://tresta.cloud')
 
 import cloudinary
 import cloudinary.uploader

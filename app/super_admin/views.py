@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 
 from app.super_admin.services import DashboardService
+from core.utils import get_frontend_url, get_default_from_email
 
 logger = logging.getLogger(__name__)
 
@@ -144,11 +145,8 @@ class CompaniesView(APIView):
                 expires_at=timezone.now() + timedelta(days=7),
             )
 
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
-            invitation_link = (
-                f"{frontend_url}/invitation/"
-                f"{invitation.token}"
-            )
+            frontend_url = get_frontend_url(request)
+            invitation_link = f"{frontend_url}/invitation/{invitation.token}"
 
             subject = 'Invitation to join as Admin'
             message = (
@@ -169,7 +167,7 @@ class CompaniesView(APIView):
             send_mail_async(
                 subject,
                 message,
-                settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
+                get_default_from_email(),
                 [admin_user.email],
                 html_message=html_message,
             )
@@ -214,7 +212,7 @@ class CompanyDetailView(APIView):
                             invitation.expires_at = timezone.now() + timedelta(days=7)
                             invitation.save()
                             
-                            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+                            frontend_url = get_frontend_url(request)
                             invitation_link = f"{frontend_url}/invitation/{invitation.token}"
                             
                             subject = 'Your Admin Request has been Approved'
@@ -231,7 +229,7 @@ class CompanyDetailView(APIView):
                             <!DOCTYPE html>
                             <html>
                             <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px; margin: 0; color: #3f3f46;">
-                                <div style="max-w: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                                <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
                                     <div style="background-color: #2563eb; padding: 30px; text-align: center;">
                                         <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 1px;">WELCOME TO TRESTA</h1>
                                     </div>
@@ -240,9 +238,14 @@ class CompanyDetailView(APIView):
                                         <p style="font-size: 16px; line-height: 24px;">Your request to join as an Admin for <strong>{company.company_name}</strong> has been officially approved! We are thrilled to have you on board.</p>
                                         <p style="font-size: 16px; line-height: 24px;">To get started and set up your account password, please click the button below:</p>
                                         
-                                        <div style="text-align: center; margin: 35px 0;">
+                                        <div style="text-align: center; margin: 35px 0 25px 0;">
                                             <a href="{invitation_link}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 16px;">Set Up Account</a>
                                         </div>
+                                        
+                                        <p style="font-size: 13px; color: #94a3b8; word-break: break-all; text-align: center; margin-bottom: 25px;">
+                                            If the button above does not work, visit:<br>
+                                            <a href="{invitation_link}" style="color: #2563eb;">{invitation_link}</a>
+                                        </p>
                                         
                                         <p style="font-size: 14px; line-height: 22px; color: #71717a; margin-bottom: 0;">Please note that this link is valid for 7 days. If you did not request this access, you can safely ignore this email.</p>
                                     </div>
@@ -257,7 +260,7 @@ class CompanyDetailView(APIView):
                             send_mail(
                                 subject,
                                 message,
-                                settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
+                                get_default_from_email(),
                                 [admin_user.email],
                                 fail_silently=False,
                                 html_message=html_message,
@@ -326,7 +329,7 @@ class ResendCompanyInvitationView(APIView):
         invitation.expires_at = timezone.now() + timedelta(days=7)
         invitation.save()
 
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+        frontend_url = get_frontend_url(request)
         invitation_link = f"{frontend_url}/invitation/{invitation.token}"
 
         subject = 'Invitation to join as Admin (Resent)'
@@ -348,7 +351,7 @@ class ResendCompanyInvitationView(APIView):
         send_mail_async(
             subject,
             message,
-            settings.DEFAULT_FROM_EMAIL or 'noreply@tresta.com',
+            get_default_from_email(),
             [admin_user.email],
             html_message=html_message,
         )
