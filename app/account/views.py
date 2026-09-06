@@ -279,7 +279,6 @@ class SendInvitationView(APIView):
             UserAccount.Role.COMMERCIAL_DEPARTMENT,
             UserAccount.Role.FINANCE_DEPARTMENT,
             UserAccount.Role.TECHNICAL_DEPARTMENT,
-            UserAccount.Role.EMPLOYEE,
         },
         # These management roles can only invite mobile-app (employee) users
         UserAccount.Role.CONTRACTS_MANAGER: {UserAccount.Role.EMPLOYEE},

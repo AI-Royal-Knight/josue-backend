@@ -131,3 +131,24 @@ class SnagListFixesTestCase(TestCase):
                 allowed_values,
                 f"Role {r} should be allowed to invite mobile app user (employee)"
             )
+
+    def test_project_admin_cannot_invite_employee(self):
+        """Project Admin must NOT have employee in allowed invite roles and must be rejected on sending employee invite."""
+        from app.account.views import SendInvitationView
+        req = self.factory.get('/api/v1/account/invitations/allowed-roles/')
+        force_authenticate(req, user=self.project_admin)
+        res = AllowedInviteRolesView.as_view()(req)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        allowed_values = [item['value'] for item in res.data.get('allowed_roles', [])]
+        self.assertNotIn(UserAccount.Role.EMPLOYEE, allowed_values)
+
+        # Attempt to invite employee
+        req_invite = self.factory.post(
+            '/api/v1/account/invitations/send/',
+            {'email': 'emp@acme.com', 'role': UserAccount.Role.EMPLOYEE},
+            format='json'
+        )
+        force_authenticate(req_invite, user=self.project_admin)
+        res_invite = SendInvitationView.as_view()(req_invite)
+        self.assertEqual(res_invite.status_code, status.HTTP_403_FORBIDDEN)
+
