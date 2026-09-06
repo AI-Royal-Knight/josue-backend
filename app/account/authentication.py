@@ -7,8 +7,21 @@ class CustomJWTAuthentication(JWTAuthentication):
             user, token = result
             active_role = request.headers.get("X-Active-Role")
             
-            # If an active role is provided and it matches one of the user's roles
-            if active_role and active_role in [user.role, user.secondary_role]:
+            # Check if active role is valid for this user
+            from app.account.models import UserAccount
+            has_role = False
+            if active_role:
+                if active_role == "manager":
+                    active_role = UserAccount.Role.MANAGERS
+
+                if user.role in [UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN]:
+                    has_role = True
+                elif active_role in [user.role, user.secondary_role]:
+                    has_role = True
+                elif hasattr(user, 'role_assignments') and user.role_assignments.filter(role=active_role).exists():
+                    has_role = True
+
+            if has_role:
                 user.active_role = active_role
             else:
                 user.active_role = user.role

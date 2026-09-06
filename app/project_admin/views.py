@@ -516,8 +516,8 @@ class ProjectRoleAssignmentsView(APIView):
         # Group by role
         roles_data = []
         for role_key, role_name in UserAccount.Role.choices:
-            if role_key in [UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN]:
-                continue # Skip system roles
+            if role_key in [UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN, UserAccount.Role.MANAGING_DIRECTOR]:
+                continue # Skip system and company-level executive roles
                 
             role_assignments = assignments.filter(role=role_key)
             users_data = []
@@ -559,6 +559,12 @@ class ProjectRoleAssignmentsView(APIView):
             return Response({"error": "role_key is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         from app.account.models import RoleAssignment, UserAccount
+
+        if role_key in [UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN, UserAccount.Role.MANAGING_DIRECTOR]:
+            return Response(
+                {"error": "Managing Director cannot be assigned to individual projects. Managing Directors are invited by Admin at company level."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         
         # Verify users exist and are in the company (using the same logic as GET)

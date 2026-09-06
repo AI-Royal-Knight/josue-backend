@@ -284,6 +284,7 @@ class SendInvitationView(APIView):
         # These management roles can only invite mobile-app (employee) users
         UserAccount.Role.CONTRACTS_MANAGER: {UserAccount.Role.EMPLOYEE},
         UserAccount.Role.MANAGERS: {UserAccount.Role.EMPLOYEE},
+        "manager": {UserAccount.Role.EMPLOYEE},
         UserAccount.Role.PROJECT_DIRECTOR: {UserAccount.Role.EMPLOYEE},
         UserAccount.Role.SUPERVISOR: {UserAccount.Role.EMPLOYEE},
         UserAccount.Role.DOCUMENT_CONTROLLER: {UserAccount.Role.EMPLOYEE},
@@ -298,11 +299,15 @@ class SendInvitationView(APIView):
             return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
 
         caller_role = request.user.role
+        if caller_role == "manager":
+            caller_role = UserAccount.Role.MANAGERS
         email = serializer.validated_data["email"]
         role = serializer.validated_data["role"]
 
         # ── Role-based invite permission check ───────────────────────────────
         allowed_roles = self.INVITE_PERMISSIONS.get(caller_role, set())
+        if not allowed_roles and caller_role == "manager":
+            allowed_roles = self.INVITE_PERMISSIONS.get(UserAccount.Role.MANAGERS, set())
         if role not in allowed_roles:
             return Response(
                 {"error": f"Your role ({caller_role}) is not permitted to invite users as '{role}'."},
@@ -373,6 +378,8 @@ class AllowedInviteRolesView(APIView):
     def get(self, request):
         caller_role = request.user.role
         allowed = SendInvitationView.INVITE_PERMISSIONS.get(caller_role, set())
+        if not allowed and caller_role == "manager":
+            allowed = SendInvitationView.INVITE_PERMISSIONS.get(UserAccount.Role.MANAGERS, set())
         role_choices = dict(UserAccount.Role.choices)
         return Response({
             "allowed_roles": [
@@ -437,12 +444,20 @@ class AcceptInvitationView(APIView):
                 'is_active': is_active_on_accept,
             }
         )
-        if created:
-            user.set_password(serializer.validated_data["password"])
-            user.save()
+        # Always update credentials and details regardless of whether account was pre-created
+        user.first_name = serializer.validated_data["first_name"]
+        user.last_name = serializer.validated_data["last_name"]
+        user.role = invitation.role
+        if invitation.secondary_role:
+            user.secondary_role = invitation.secondary_role
+        if not user.company and invitation.company:
+            user.company = invitation.company
+        user.is_active = is_active_on_accept
+        user.set_password(serializer.validated_data["password"])
+        user.save()
 
         # Create UserProfile for employees so document controller can review & approve
-        if is_employee and created:
+        if is_employee:
             UserProfile.objects.get_or_create(
                 user=user,
                 defaults={
@@ -450,6 +465,20 @@ class AcceptInvitationView(APIView):
                     'is_approved': False,
                 }
             )
+
+        # If supplier, ensure SupplierProfile and CompanySupplier link are created
+        if invitation.role == UserAccount.Role.SUPPLIER:
+            from app.account.models import SupplierProfile, CompanySupplier
+            supplier_profile, _ = SupplierProfile.objects.get_or_create(
+                user=user,
+                defaults={'company_name': f"{user.first_name} {user.last_name}".strip() or "Supplier"}
+            )
+            if invitation.company:
+                CompanySupplier.objects.get_or_create(
+                    company=invitation.company,
+                    supplier=supplier_profile,
+                    defaults={'eom_payment_terms': 30, 'credit_limit': 0.00}
+                )
 
         # Create role assignment
         RoleAssignment.objects.get_or_create(
