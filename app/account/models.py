@@ -487,18 +487,31 @@ class SupplierProfile(BaseModel):
 
 
 class CompanySupplier(BaseModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACTIVE = "active", "Active"
+        DECLINED = "declined", "Declined"
+        REVOKED = "revoked", "Revoked"
+
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="suppliers")
     supplier = models.ForeignKey(SupplierProfile, on_delete=models.CASCADE, related_name="companies")
     
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     eom_payment_terms = models.PositiveIntegerField(help_text="End of Month payment terms in days", default=30)
     credit_limit = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+
+    invited_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name="invited_company_suppliers")
+    invited_at = models.DateTimeField(default=timezone.now)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    declined_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "company_suppliers"
         unique_together = ('company', 'supplier')
 
     def __str__(self):
-        return f"{self.supplier.company_name} -> {self.company.company_name}"
+        return f"{self.supplier.company_name} -> {self.company.company_name} ({self.status})"
 
 
 class Invitation(BaseModel):

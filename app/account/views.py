@@ -287,8 +287,7 @@ class SendInvitationView(APIView):
         UserAccount.Role.PROJECT_DIRECTOR: {UserAccount.Role.EMPLOYEE},
         UserAccount.Role.SUPERVISOR: {UserAccount.Role.EMPLOYEE},
         UserAccount.Role.DOCUMENT_CONTROLLER: {UserAccount.Role.EMPLOYEE},
-        # Procurement can only invite suppliers
-        UserAccount.Role.PROCUREMENT_DEPARTMENT: {UserAccount.Role.SUPPLIER},
+        # Supplier invitations are strictly separate and handled via /api/v1/procurement/suppliers/invite/
     }
 
     @extend_schema(request=SendInvitationSerializer, responses={200: dict})
@@ -468,16 +467,25 @@ class AcceptInvitationView(APIView):
         # If supplier, ensure SupplierProfile and CompanySupplier link are created
         if invitation.role == UserAccount.Role.SUPPLIER:
             from app.account.models import SupplierProfile, CompanySupplier
+            from app.supplier.models import SupplierInvitation
             supplier_profile, _ = SupplierProfile.objects.get_or_create(
                 user=user,
                 defaults={'company_name': f"{user.first_name} {user.last_name}".strip() or "Supplier"}
             )
             if invitation.company:
-                CompanySupplier.objects.get_or_create(
+                cs, _ = CompanySupplier.objects.get_or_create(
                     company=invitation.company,
                     supplier=supplier_profile,
                     defaults={'eom_payment_terms': 30, 'credit_limit': 0.00}
                 )
+                cs.status = CompanySupplier.Status.ACTIVE
+                cs.accepted_at = timezone.now()
+                cs.save()
+
+                SupplierInvitation.objects.filter(
+                    token=str(invitation.token),
+                    status=SupplierInvitation.Status.PENDING
+                ).update(status=SupplierInvitation.Status.ACCEPTED, accepted_at=timezone.now())
 
         # Create role assignment
         RoleAssignment.objects.get_or_create(

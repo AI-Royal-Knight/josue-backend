@@ -13,10 +13,50 @@ class SupplierProfileSerializer(serializers.ModelSerializer):
 
 class CompanySupplierSerializer(serializers.ModelSerializer):
     supplier = SupplierProfileSerializer(read_only=True)
+    invitation_token = serializers.SerializerMethodField()
+    invitation_link = serializers.SerializerMethodField()
     
     class Meta:
         model = CompanySupplier
-        fields = ('id', 'supplier', 'credit_limit', 'eom_payment_terms')
+        fields = (
+            'id', 'supplier', 'status', 'credit_limit', 'eom_payment_terms',
+            'invited_at', 'accepted_at', 'declined_at',
+            'invitation_token', 'invitation_link'
+        )
+
+    def get_invitation_token(self, obj):
+        inv = obj.invitations.filter(status='pending').order_by('-created_at').first()
+        return inv.token if inv else None
+
+    def get_invitation_link(self, obj):
+        token = self.get_invitation_token(obj)
+        if not token:
+            return None
+        request = self.context.get('request')
+        from core.utils import get_frontend_url
+        frontend_url = get_frontend_url(request) if request else "https://tresta.cloud"
+        return f"{frontend_url}/supplier/invitation/{token}"
+
+
+class ProcurementSupplierInvoiceSerializer(serializers.ModelSerializer):
+    supplier_name = serializers.CharField(source='company_supplier.supplier.company_name', read_only=True)
+    supplier_email = serializers.CharField(source='company_supplier.supplier.user.email', read_only=True)
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        from app.supplier.models import SupplierInvoice
+        model = SupplierInvoice
+        fields = (
+            'id', 'invoice_number', 'invoice_date', 'amount', 'description',
+            'file', 'file_url', 'status', 'procurement_comments',
+            'supplier_name', 'supplier_email', 'created_at', 'processed_at'
+        )
+        read_only_fields = ('id', 'invoice_number', 'invoice_date', 'amount', 'description', 'file', 'created_at')
+
+    def get_file_url(self, obj):
+        if obj.file:
+            return obj.file.url
+        return None
 
 class InviteSupplierSerializer(serializers.Serializer):
     email = serializers.EmailField()

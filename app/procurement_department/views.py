@@ -12,12 +12,15 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from core.utils import get_frontend_url, get_default_from_email
 
+import secrets
 from app.account.models import CompanySupplier, SupplierProfile, UserAccount, Invitation, RoleAssignment
+from app.supplier.models import SupplierInvitation, SupplierInvoice
 from app.project_admin.models import Project
 from app.procurement_department.models import Quotation
 from .serializers import (
     CompanySupplierSerializer, InviteSupplierSerializer,
-    QuotationSerializer, ProjectNestedSerializer
+    QuotationSerializer, ProjectNestedSerializer,
+    ProcurementSupplierInvoiceSerializer
 )
 
 class SupplierListView(APIView):
@@ -32,8 +35,8 @@ class SupplierListView(APIView):
             company = request.user.company
         elif request.user.role == UserAccount.Role.SUPER_ADMIN:
             # Super admin can see all
-            suppliers = CompanySupplier.objects.all()
-            serializer = CompanySupplierSerializer(suppliers, many=True)
+            suppliers = CompanySupplier.objects.select_related('supplier', 'supplier__user').all().order_by('-created_at')
+            serializer = CompanySupplierSerializer(suppliers, many=True, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             # For Procurement dept, get company from role assignment
@@ -48,15 +51,11 @@ class SupplierListView(APIView):
             company_ids = request.user.assigned_projects.values_list('company_id', flat=True)
             if not company_ids:
                 return Response([], status=status.HTTP_200_OK)
-            suppliers = CompanySupplier.objects.filter(company_id__in=company_ids).distinct()
-            serializer = CompanySupplierSerializer(suppliers, many=True)
+            suppliers = CompanySupplier.objects.select_related('supplier', 'supplier__user').filter(company_id__in=company_ids).distinct().order_by('-created_at')
+            serializer = CompanySupplierSerializer(suppliers, many=True, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
         
-        # Get suppliers directly linked to this company
-        direct_suppliers = CompanySupplier.objects.filter(company=company)
-        
         # Also get supplier IDs linked via quotations for this company's projects
-        from app.procurement_department.models import Quotation
         quoted_supplier_ids = Quotation.objects.filter(
             project__company=company,
             supplier__isnull=False
@@ -64,40 +63,41 @@ class SupplierListView(APIView):
         
         # Merge both sets
         from django.db.models import Q
-        suppliers = CompanySupplier.objects.filter(
+        suppliers = CompanySupplier.objects.select_related('supplier', 'supplier__user').filter(
             Q(company=company) | Q(id__in=quoted_supplier_ids)
-        ).distinct()
+        ).distinct().order_by('-created_at')
         
-        serializer = CompanySupplierSerializer(suppliers, many=True)
+        serializer = CompanySupplierSerializer(suppliers, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class SupplierInviteView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=dict, responses={200: dict})
+    @extend_schema(request=InviteSupplierSerializer, responses={201: dict})
     def post(self, request):
         # Only procurement_department role can invite suppliers
-        if request.user.role != UserAccount.Role.PROCUREMENT_DEPARTMENT:
+        is_procurement = request.user.role == UserAccount.Role.PROCUREMENT_DEPARTMENT
+        if not is_procurement:
             # Check if user has a procurement role assignment (multi-role user)
-            role_assignment = RoleAssignment.objects.filter(
+            is_procurement = RoleAssignment.objects.filter(
                 user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT
-            ).first()
-            if not role_assignment:
-                return Response(
-                    {"detail": "Only Procurement Department users can invite suppliers."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            ).exists()
+
+        if not is_procurement:
+            return Response(
+                {"detail": "Only Procurement Department users can invite suppliers."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Get company from role assignment or user.company
+        role_assignment = RoleAssignment.objects.filter(
+            user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT
+        ).first()
+        if role_assignment and role_assignment.company:
             company = role_assignment.company
         else:
-            # Get company from role assignment or user.company
-            role_assignment = RoleAssignment.objects.filter(
-                user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT
-            ).first()
-            if role_assignment and role_assignment.company:
-                company = role_assignment.company
-            else:
-                company = request.user.company
+            company = request.user.company
 
         if not company:
             return Response(
@@ -107,62 +107,106 @@ class SupplierInviteView(APIView):
 
         serializer = InviteSupplierSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data['email']
-            company_name = serializer.validated_data['company_name']
+            email = serializer.validated_data['email'].lower().strip()
+            company_name = serializer.validated_data['company_name'].strip()
 
-            # Check if user exists; if so, they may already be a supplier (multi-company scenario)
-            user, created = UserAccount.objects.get_or_create(
-                email=email,
-                defaults={'role': UserAccount.Role.SUPPLIER, 'is_active': True}
-            )
-
-            # If existing user is not a supplier, reject — suppliers are a separate user type
-            if not created and user.role != UserAccount.Role.SUPPLIER:
-                return Response(
-                    {"detail": "This email is registered to a non-supplier user and cannot be invited as a supplier."},
-                    status=status.HTTP_400_BAD_REQUEST,
+            # Check if user exists; if not, create a supplier user account
+            user = UserAccount.objects.filter(email=email).first()
+            created_user = False
+            if not user:
+                user = UserAccount.objects.create_user(
+                    email=email,
+                    role=UserAccount.Role.SUPPLIER,
+                    is_active=True
                 )
+                created_user = True
 
-            # Create or get supplier profile
+            # Create or get supplier profile for this user
             supplier_profile, _ = SupplierProfile.objects.get_or_create(
                 user=user,
                 defaults={'company_name': company_name}
             )
+            if company_name and not supplier_profile.company_name:
+                supplier_profile.company_name = company_name
+                supplier_profile.save(update_fields=['company_name'])
 
-            # Link supplier to this company (multi-company: same supplier, multiple companies)
-            company_supplier, created_cs = CompanySupplier.objects.get_or_create(
+            # Find or create CompanySupplier relationship
+            company_supplier = CompanySupplier.objects.filter(
                 company=company,
-                supplier=supplier_profile,
-                defaults={'eom_payment_terms': 30, 'credit_limit': 0.00}
-            )
+                supplier=supplier_profile
+            ).first()
 
-            if not created_cs:
+            if company_supplier and company_supplier.status == CompanySupplier.Status.ACTIVE:
                 return Response(
-                    {"detail": "This supplier is already linked to your company."},
+                    {"detail": "This supplier is already linked and active for your company."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Create Invitation record
-            invitation, _ = Invitation.objects.get_or_create(
+            if not company_supplier:
+                company_supplier = CompanySupplier.objects.create(
+                    company=company,
+                    supplier=supplier_profile,
+                    status=CompanySupplier.Status.PENDING,
+                    invited_by=request.user,
+                    invited_at=timezone.now(),
+                    eom_payment_terms=30,
+                    credit_limit=0.00
+                )
+            else:
+                company_supplier.status = CompanySupplier.Status.PENDING
+                company_supplier.invited_by = request.user
+                company_supplier.invited_at = timezone.now()
+                company_supplier.save(update_fields=['status', 'invited_by', 'invited_at'])
+
+            # Expire previous pending invitations for this company supplier
+            SupplierInvitation.objects.filter(
+                company=company,
+                company_supplier=company_supplier,
+                status=SupplierInvitation.Status.PENDING
+            ).update(status=SupplierInvitation.Status.EXPIRED)
+
+            import uuid
+            token_uuid = uuid.uuid4()
+            token = str(token_uuid)
+
+            invitation = SupplierInvitation.objects.create(
+                company=company,
+                company_supplier=company_supplier,
+                email=email,
+                supplier_name=company_name,
+                token=token,
+                status=SupplierInvitation.Status.PENDING,
+                invited_by=request.user,
+                expires_at=timezone.now() + timezone.timedelta(days=7),
+            )
+
+            # Mirror to generic Invitation table for backwards compatibility
+            Invitation.objects.filter(
+                email=email,
+                company=company,
+                role=UserAccount.Role.SUPPLIER,
+                status=Invitation.Status.PENDING
+            ).update(status=Invitation.Status.EXPIRED)
+
+            Invitation.objects.create(
                 email=email,
                 role=UserAccount.Role.SUPPLIER,
                 company=company,
-                defaults={
-                    'status': Invitation.Status.PENDING,
-                    'expires_at': timezone.now() + timezone.timedelta(days=7),
-                    'invited_by': request.user,
-                }
+                invited_by=request.user,
+                token=token_uuid,
+                status=Invitation.Status.PENDING,
+                expires_at=timezone.now() + timezone.timedelta(days=7),
             )
 
-            # Send email
+            # Build invitation link
             frontend_url = get_frontend_url(request)
-            invitation_link = f"{frontend_url}/accept-invite/{invitation.token}"
+            invitation_link = f"{frontend_url}/supplier/invitation/{invitation.token}"
 
             subject = f"You have been invited by {company.company_name} as a Supplier"
             message = (
                 f"Hello,\n\n"
                 f"You have been invited as a Supplier for {company.company_name}.\n"
-                f"Please use the following link to accept your invitation and set up your account:\n"
+                f"Please use the following link to accept your invitation and access the Supplier Portal:\n"
                 f"{invitation_link}\n\n"
                 f"This link will expire in 7 days.\n\n"
                 f"Thank you."
@@ -174,22 +218,103 @@ class SupplierInviteView(APIView):
                 'invitation_link': invitation_link,
             })
 
-            send_mail(
-                subject,
-                message,
-                get_default_from_email(),
-                [email],
-                fail_silently=False,
-                html_message=html_message,
-            )
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    get_default_from_email(),
+                    [email],
+                    fail_silently=False,
+                    html_message=html_message,
+                )
+            except Exception as e:
+                # Log email failure but proceed
+                pass
 
             return Response({
                 "detail": "Supplier invited successfully.",
-                "supplier": CompanySupplierSerializer(company_supplier).data,
-                "is_new_supplier": created,
+                "supplier": CompanySupplierSerializer(company_supplier, context={'request': request}).data,
+                "invitation_token": token,
+                "invitation_link": invitation_link,
+                "is_new_supplier": created_user,
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProcurementSupplierInvoiceListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: ProcurementSupplierInvoiceSerializer(many=True)})
+    def get(self, request):
+        company = None
+        if request.user.role == UserAccount.Role.ADMIN:
+            company = request.user.company
+        elif request.user.role == UserAccount.Role.SUPER_ADMIN:
+            invoices = SupplierInvoice.objects.select_related(
+                "company", "company_supplier", "company_supplier__supplier", "company_supplier__supplier__user"
+            ).all().order_by("-created_at")
+            return Response(ProcurementSupplierInvoiceSerializer(invoices, many=True).data, status=status.HTTP_200_OK)
+        else:
+            role_assignment = RoleAssignment.objects.filter(user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT).first()
+            if role_assignment and role_assignment.company:
+                company = role_assignment.company
+            elif request.user.company:
+                company = request.user.company
+
+        if not company:
+            return Response([], status=status.HTTP_200_OK)
+
+        invoices = SupplierInvoice.objects.select_related(
+            "company", "company_supplier", "company_supplier__supplier", "company_supplier__supplier__user"
+        ).filter(company=company).order_by("-created_at")
+
+        serializer = ProcurementSupplierInvoiceSerializer(invoices, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ProcurementSupplierInvoiceDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: ProcurementSupplierInvoiceSerializer})
+    def patch(self, request, pk):
+        company = None
+        if request.user.role == UserAccount.Role.ADMIN:
+            company = request.user.company
+        elif request.user.role == UserAccount.Role.SUPER_ADMIN:
+            pass
+        else:
+            role_assignment = RoleAssignment.objects.filter(user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT).first()
+            if role_assignment and role_assignment.company:
+                company = role_assignment.company
+            elif request.user.company:
+                company = request.user.company
+
+        try:
+            if company:
+                invoice = SupplierInvoice.objects.select_related(
+                    "company", "company_supplier", "company_supplier__supplier", "company_supplier__supplier__user"
+                ).get(id=pk, company=company)
+            else:
+                invoice = SupplierInvoice.objects.select_related(
+                    "company", "company_supplier", "company_supplier__supplier", "company_supplier__supplier__user"
+                ).get(id=pk)
+        except SupplierInvoice.DoesNotExist:
+            return Response({"detail": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        new_status = request.data.get("status")
+        comments = request.data.get("procurement_comments")
+
+        if new_status and new_status in SupplierInvoice.Status.values:
+            invoice.status = new_status
+        if comments is not None:
+            invoice.procurement_comments = comments
+
+        invoice.processed_by = request.user
+        invoice.processed_at = timezone.now()
+        invoice.save()
+
+        return Response(ProcurementSupplierInvoiceSerializer(invoice).data, status=status.HTTP_200_OK)
 
 class ProcurementProjectListView(APIView):
 
@@ -222,6 +347,24 @@ class QuotationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if self.request.user.role == UserAccount.Role.ADMIN:
             return Quotation.objects.filter(project__company=self.request.user.company)
+
+        # Allow suppliers to see their quotations
+        from app.account.models import SupplierProfile
+        is_supplier = (
+            self.request.user.role == UserAccount.Role.SUPPLIER
+            or SupplierProfile.objects.filter(user=self.request.user).exists()
+            or RoleAssignment.objects.filter(user=self.request.user, role=UserAccount.Role.SUPPLIER).exists()
+        )
+        if is_supplier:
+            from django.db.models import Q
+            company_id = self.request.headers.get("X-Company-ID") or self.request.query_params.get("company_id")
+            qs = Quotation.objects.filter(
+                Q(supplier__supplier__user=self.request.user) |
+                Q(supplier_email__icontains=self.request.user.email)
+            )
+            if company_id:
+                qs = qs.filter(Q(project__company_id=company_id) | Q(supplier__company_id=company_id))
+            return qs.distinct().order_by("-created_at")
 
         # Allow Procurement dept to see all company quotations
         role_assignment = RoleAssignment.objects.filter(
@@ -325,12 +468,15 @@ class QuotationViewSet(viewsets.ModelViewSet):
             if email_to:
                 frontend_url = get_frontend_url(getattr(self, 'request', None))
                 supplier_link = f"{frontend_url}/supplier-quote/{quotation.supplier_token}"
+                portal_link = f"{frontend_url}/supplier"
                 
                 subject = f"Request for Quotation: {quotation.quote_ref}"
                 message = (
                     f"Hello,\n\n"
                     f"Please find attached our Request for Quotation ({quotation.quote_ref}).\n"
-                    f"You can submit your pricing and upload your own quote PDF by clicking the link below:\n\n"
+                    f"You can view, submit your pricing, and upload your quote PDF directly in your Supplier Portal:\n"
+                    f"{portal_link}\n\n"
+                    f"Or by clicking your direct quote link:\n"
                     f"{supplier_link}\n\n"
                     f"Thank you."
                 )
@@ -432,13 +578,16 @@ class QuotationViewSet(viewsets.ModelViewSet):
         if email_to:
             frontend_url = get_frontend_url(request)
             supplier_link = f"{frontend_url}/supplier-quote/{quotation.supplier_token}"
+            portal_link = f"{frontend_url}/supplier"
             
             subject = f"Re-quote Requested: {quotation.quote_ref}"
             message = (
                 f"Hello,\n\n"
                 f"We have requested a re-quote for {quotation.quote_ref}.\n\n"
                 f"Procurement feedback:\n{comments}\n\n"
-                f"Please submit your revised pricing by clicking the link below:\n\n"
+                f"Please submit your revised pricing in your Supplier Portal:\n"
+                f"{portal_link}\n\n"
+                f"Or by clicking your direct quote link below:\n"
                 f"{supplier_link}\n\n"
                 f"Thank you."
             )
@@ -571,7 +720,23 @@ class SupplierQuotationView(APIView):
                         except Exception:
                             pass # Skip invalid IDs
         
-        # Recalculate quote_total if needed or keep existing logic
+        # Recalculate quote_total from line items (supplier_price takes precedence over each)
+        import decimal
+        total = decimal.Decimal('0.0')
+        has_supplier_price = False
+        for item in quotation.line_items.all():
+            if item.supplier_price is not None:
+                has_supplier_price = True
+            price = item.supplier_price if item.supplier_price is not None else item.each
+            discount = item.discount or decimal.Decimal('0.0')
+            qty = item.qty or decimal.Decimal('1.0')
+            line_total = float(qty) * float(price) * (1.0 - (float(discount) / 100.0))
+            total += decimal.Decimal(str(round(line_total, 2)))
+
+        if has_supplier_price:
+            quotation.quote_total = total
+            quotation.save(update_fields=['quote_total'])
+
         serializer = QuotationSerializer(quotation)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
