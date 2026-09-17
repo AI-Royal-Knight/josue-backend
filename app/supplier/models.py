@@ -86,6 +86,28 @@ class SupplierInvoice(BaseModel):
         default=Status.SUBMITTED
     )
 
+    # PO / Call-Off linkage
+    po_reference = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="The PO (Quotation) reference this invoice is against, e.g. QR-2026-ABC123"
+    )
+    call_off = models.ForeignKey(
+        'procurement_department.OrderLineCallOff',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supplier_invoices',
+        help_text="FK to the specific call-off this invoice covers"
+    )
+    call_off_reference = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Call-off reference string, e.g. CO-XXXXXX (mirrors call_off.call_off_ref)"
+    )
+
     procurement_comments = models.TextField(blank=True, default="")
     processed_by = models.ForeignKey(
         'account.UserAccount',

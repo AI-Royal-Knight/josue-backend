@@ -42,6 +42,8 @@ class ProcurementSupplierInvoiceSerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source='company_supplier.supplier.company_name', read_only=True)
     supplier_email = serializers.CharField(source='company_supplier.supplier.user.email', read_only=True)
     file_url = serializers.SerializerMethodField()
+    call_off_amount = serializers.SerializerMethodField()
+    call_off_qty = serializers.SerializerMethodField()
 
     class Meta:
         from app.supplier.models import SupplierInvoice
@@ -49,13 +51,29 @@ class ProcurementSupplierInvoiceSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'invoice_number', 'invoice_date', 'amount', 'description',
             'file', 'file_url', 'status', 'procurement_comments',
-            'supplier_name', 'supplier_email', 'created_at', 'processed_at'
+            'supplier_name', 'supplier_email', 'created_at', 'processed_at',
+            # PO / Call-off linkage fields
+            'po_reference', 'call_off_reference', 'call_off_amount', 'call_off_qty',
         )
         read_only_fields = ('id', 'invoice_number', 'invoice_date', 'amount', 'description', 'file', 'created_at')
 
     def get_file_url(self, obj):
         if obj.file:
             return obj.file.url
+        return None
+
+    def get_call_off_amount(self, obj):
+        """Total value of the linked call-off (price × qty)."""
+        if obj.call_off:
+            try:
+                return str(obj.call_off.price * obj.call_off.qty)
+            except Exception:
+                pass
+        return None
+
+    def get_call_off_qty(self, obj):
+        if obj.call_off:
+            return str(obj.call_off.qty)
         return None
 
 class InviteSupplierSerializer(serializers.Serializer):

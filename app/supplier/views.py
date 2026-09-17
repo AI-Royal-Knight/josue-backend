@@ -441,3 +441,59 @@ class SupplierQuotationDetailView(APIView):
         serializer = QuotationSerializer(quotation, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+class SupplierCallOffListView(APIView):
+    """
+    GET /supplier/call-offs/
+
+    Returns all call-offs for this supplier grouped by PO (quote_ref).
+    Used by the supplier portal to populate the PO -> Call-Off selector
+    when submitting an invoice.
+    """
+    permission_classes = [IsActiveSupplierForCompany]
+
+    @extend_schema(responses={200: dict})
+    def get(self, request):
+        from app.procurement_department.models import OrderLineCallOff
+        from django.db.models import Q
+
+        call_offs = OrderLineCallOff.objects.select_related(
+            "line_item",
+            "line_item__quotation",
+            "line_item__quotation__project",
+            "line_item__quotation__supplier",
+        ).filter(
+            Q(line_item__quotation__supplier=request.active_company_supplier) |
+            (
+                Q(line_item__quotation__project__company=request.active_company) &
+                Q(line_item__quotation__supplier_email__icontains=request.user.email)
+            )
+        ).distinct().order_by("-date")
+
+        grouped: dict = {}
+        for co in call_offs:
+            quotation = co.line_item.quotation
+            po_ref = quotation.quote_ref
+            if po_ref not in grouped:
+                grouped[po_ref] = {
+                    "po_ref": po_ref,
+                    "quotation_id": str(quotation.id),
+                    "project_name": quotation.project.project_name if quotation.project else "",
+                    "call_offs": [],
+                }
+            try:
+                total = float(co.price) * float(co.qty)
+            except Exception:
+                total = 0
+            grouped[po_ref]["call_offs"].append({
+                "id": str(co.id),
+                "call_off_ref": co.call_off_ref,
+                "price": str(co.price),
+                "qty": str(co.qty),
+                "total": f"{total:.2f}",
+                "date": str(co.date),
+                "expected_delivery_date": str(co.expected_delivery_date) if co.expected_delivery_date else None,
+                "line_item_description": co.line_item.description,
+            })
+
+        return Response(list(grouped.values()), status=status.HTTP_200_OK)

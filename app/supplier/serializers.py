@@ -70,6 +70,9 @@ class SupplierInvoiceSerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source="company_supplier.supplier.company_name", read_only=True)
     supplier_email = serializers.CharField(source="company_supplier.supplier.user.email", read_only=True)
     file_url = serializers.SerializerMethodField()
+    # Call-off enrichment — derived from the FK if linked
+    call_off_amount = serializers.SerializerMethodField()
+    call_off_qty = serializers.SerializerMethodField()
 
     class Meta:
         model = SupplierInvoice
@@ -87,6 +90,10 @@ class SupplierInvoiceSerializer(serializers.ModelSerializer):
             "file_url",
             "status",
             "procurement_comments",
+            "po_reference",
+            "call_off_reference",
+            "call_off_amount",
+            "call_off_qty",
             "created_at",
         ]
         read_only_fields = ["id", "status", "procurement_comments", "created_at"]
@@ -96,8 +103,29 @@ class SupplierInvoiceSerializer(serializers.ModelSerializer):
             return obj.file.url
         return None
 
+    def get_call_off_amount(self, obj):
+        """Return the total value of the linked call-off (price × qty) if FK is present."""
+        if obj.call_off:
+            try:
+                return str(obj.call_off.price * obj.call_off.qty)
+            except Exception:
+                pass
+        return None
+
+    def get_call_off_qty(self, obj):
+        if obj.call_off:
+            return str(obj.call_off.qty)
+        return None
+
 
 class SupplierInvoiceCreateSerializer(serializers.ModelSerializer):
+    """
+    Used by the supplier portal to submit a new invoice.
+    Accepts po_reference and call_off (UUID FK) / call_off_reference.
+    If a call_off FK is provided, call_off_reference is auto-populated from it.
+    """
+    call_off = serializers.UUIDField(required=False, allow_null=True)
+
     class Meta:
         model = SupplierInvoice
         fields = [
@@ -106,9 +134,32 @@ class SupplierInvoiceCreateSerializer(serializers.ModelSerializer):
             "amount",
             "description",
             "file",
+            "po_reference",
+            "call_off",
+            "call_off_reference",
         ]
 
     def validate_amount(self, value):
         if value <= 0:
             raise serializers.ValidationError("Amount must be greater than 0.")
         return value
+
+    def validate(self, data):
+        call_off_id = data.get("call_off")
+        if call_off_id:
+            from app.procurement_department.models import OrderLineCallOff
+            try:
+                call_off_obj = OrderLineCallOff.objects.get(id=call_off_id)
+                # Auto-populate call_off_reference from the FK object
+                data["call_off_reference"] = call_off_obj.call_off_ref
+                # Auto-populate po_reference from the linked quotation if not provided
+                if not data.get("po_reference"):
+                    data["po_reference"] = call_off_obj.line_item.quotation.quote_ref
+                # Store the actual instance for saving
+                data["call_off"] = call_off_obj
+            except OrderLineCallOff.DoesNotExist:
+                raise serializers.ValidationError({"call_off": "Call-off reference not found."})
+        return data
+
+    def create(self, validated_data):
+        return SupplierInvoice.objects.create(**validated_data)

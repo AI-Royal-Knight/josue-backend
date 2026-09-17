@@ -9,6 +9,7 @@ from .views import (
     SupplierInvoiceDetailView,
     SupplierQuotationListView,
     SupplierQuotationDetailView,
+    SupplierCallOffListView,
 )
 
 urlpatterns = [
@@ -20,10 +21,11 @@ urlpatterns = [
     # Dedicated supplier auth
     path('auth/login/', SupplierAuthLoginView.as_view(), name='supplier-auth-login'),
 
-    # Authenticated supplier company and invoice endpoints
+    # Authenticated supplier company, invoice, and call-off endpoints
     path('companies/', SupplierCompanyListView.as_view(), name='supplier-company-list'),
     path('invoices/', SupplierInvoiceListView.as_view(), name='supplier-invoice-list'),
     path('invoices/<uuid:pk>/', SupplierInvoiceDetailView.as_view(), name='supplier-invoice-detail'),
+    path('call-offs/', SupplierCallOffListView.as_view(), name='supplier-call-off-list'),
 
     # Authenticated supplier quotations / RFQs
     path('quotations/', SupplierQuotationListView.as_view(), name='supplier-quotation-list'),
