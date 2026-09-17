@@ -27,8 +27,10 @@ services:
     image: redis:7-alpine
     container_name: josue_redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # Port 6379 is accessible internally to web and celery via 'redis:6379'.
+    # Uncomment or change the host port if you need direct Redis access from the host:
+    # ports:
+    #   - "6379:6379"
 
   celery_worker:
     build: .
