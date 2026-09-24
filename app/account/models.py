@@ -186,6 +186,21 @@ class UserAccount(
         ]
 
     @property
+    def accessible_projects(self):
+        from app.project_admin.models import Project
+        from app.account.models import RoleAssignment
+        
+        active_role = getattr(self, 'active_role', self.role)
+        
+        if active_role in [self.Role.ADMIN, self.Role.PROJECT_ADMIN, self.Role.SUPER_ADMIN, self.Role.MANAGING_DIRECTOR]:
+            if self.company:
+                return Project.objects.filter(company=self.company)
+            return Project.objects.none()
+            
+        project_ids = RoleAssignment.objects.filter(user=self, role=active_role).values_list('project_id', flat=True)
+        return Project.objects.filter(id__in=project_ids)
+
+    @property
     def is_super_admin(self):
         return self.role == self.Role.SUPER_ADMIN
 

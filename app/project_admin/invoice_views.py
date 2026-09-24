@@ -107,9 +107,9 @@ class UserInvoiceListView(APIView):
 
         from django.db.models import Q
         if company:
-            qs = UserInvoice.objects.filter(status=UserInvoice.Status.SUBMITTED).filter(Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.assigned_projects.all()))
+            qs = UserInvoice.objects.filter(status=UserInvoice.Status.SUBMITTED).filter(Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.accessible_projects))
         else:
-            qs = UserInvoice.objects.filter(status=UserInvoice.Status.SUBMITTED, project__in=user.assigned_projects.all())
+            qs = UserInvoice.objects.filter(status=UserInvoice.Status.SUBMITTED, project__in=user.accessible_projects)
 
         qs = qs.select_related("project", "created_by", "managing_director_approved_by", "finance_paid_by")
 
@@ -168,9 +168,9 @@ class UserInvoiceApproveView(APIView):
         try:
             from django.db.models import Q
             if company:
-                invoice = UserInvoice.objects.get(Q(id=invoice_id) & (Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.assigned_projects.all())))
+                invoice = UserInvoice.objects.get(Q(id=invoice_id) & (Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.accessible_projects)))
             else:
-                invoice = UserInvoice.objects.get(id=invoice_id, project__in=user.assigned_projects.all())
+                invoice = UserInvoice.objects.get(id=invoice_id, project__in=user.accessible_projects)
         except UserInvoice.DoesNotExist:
             return Response({"error": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -209,9 +209,9 @@ class UserInvoicePayView(APIView):
         try:
             from django.db.models import Q
             if company:
-                invoice = UserInvoice.objects.get(Q(id=invoice_id) & (Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.assigned_projects.all())))
+                invoice = UserInvoice.objects.get(Q(id=invoice_id) & (Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.accessible_projects)))
             else:
-                invoice = UserInvoice.objects.get(id=invoice_id, project__in=user.assigned_projects.all())
+                invoice = UserInvoice.objects.get(id=invoice_id, project__in=user.accessible_projects)
         except UserInvoice.DoesNotExist:
             return Response({"error": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -257,9 +257,9 @@ class UserInvoiceCommercialCommentView(APIView):
         try:
             from django.db.models import Q
             if company:
-                invoice = UserInvoice.objects.get(Q(id=invoice_id) & (Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.assigned_projects.all())))
+                invoice = UserInvoice.objects.get(Q(id=invoice_id) & (Q(project__company__company_name__iexact=company.company_name) | Q(project__in=user.accessible_projects)))
             else:
-                invoice = UserInvoice.objects.get(id=invoice_id, project__in=user.assigned_projects.all())
+                invoice = UserInvoice.objects.get(id=invoice_id, project__in=user.accessible_projects)
         except UserInvoice.DoesNotExist:
             return Response({"error": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
 

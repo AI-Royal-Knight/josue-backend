@@ -24,7 +24,7 @@ class CMProjectListView(APIView):
         if not role_assignment or not role_assignment.company:
             return Response({"detail": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
             
-        projects = request.user.assigned_projects.all()
+        projects = request.user.accessible_projects
         serializer = CMProjectSerializer(projects, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -43,7 +43,7 @@ class CMSubfolderUpdateView(APIView):
             return Response({"error": "Subfolder not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Check if the user is authorized to this project
-        if not request.user.assigned_projects.filter(id=subfolder.folder.project.id).exists():
+        if not request.user.accessible_projects.filter(id=subfolder.folder.project.id).exists():
             return Response({"detail": "Not authorized to access this project's folders."}, status=status.HTTP_403_FORBIDDEN)
 
         rows = request.data.get('rows')

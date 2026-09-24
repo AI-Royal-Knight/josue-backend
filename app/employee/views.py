@@ -15,7 +15,7 @@ class EmployeeAssignedProjectsView(APIView):
         if request.user.role != 'employee':
             return Response({"error": "Only employees can access this."}, status=status.HTTP_403_FORBIDDEN)
         
-        projects = request.user.assigned_projects.all()
+        projects = request.user.accessible_projects
         serializer = ProjectListSerializer(projects, many=True)
         return Response({"projects": serializer.data}, status=status.HTTP_200_OK)
 
@@ -56,7 +56,7 @@ class EmployeeAssignProjectView(APIView):
             return Response({"error": "Project not found or you do not have access to it."}, status=status.HTTP_404_NOT_FOUND)
 
         # Check if already assigned
-        if request.user.assigned_projects.filter(id=project_id).exists():
+        if request.user.accessible_projects.filter(id=project_id).exists():
             return Response({"message": "You are already assigned to this project."}, status=status.HTTP_200_OK)
 
         # Self-assign to project
@@ -558,7 +558,7 @@ class DailyRegister(APIView):
         if user.role in ["super_admin", "admin", "project_director", "managing_director"]:
             logs = AttendanceLog.objects.filter(company=user.company)
         else:
-            logs = AttendanceLog.objects.filter(project__in=user.assigned_projects.all())
+            logs = AttendanceLog.objects.filter(project__in=user.accessible_projects)
             
         if project_id:
             logs = logs.filter(project_id=project_id)

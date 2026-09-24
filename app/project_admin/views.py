@@ -52,7 +52,7 @@ class MyProjectsView(APIView):
                 return Response({"projects": [], "total_count": 0}, status=status.HTTP_200_OK)
             projects = Project.objects.filter(company=user.company)
         else:
-            projects = user.assigned_projects.all()
+            projects = user.accessible_projects
 
         serializer = ProjectListSerializer(projects, many=True)
         return Response(
@@ -622,7 +622,7 @@ class ProjectRoleAssignmentsView(APIView):
                     company=request.user.company
                 )
                 # Add project to user's assigned projects list so they can see it
-                if not user.assigned_projects.filter(id=project.id).exists():
+                if not user.accessible_projects.filter(id=project.id).exists():
                     user.assigned_projects.add(project)
                     # Create a notification for the user
                     from app.account.models import Notification
@@ -905,7 +905,7 @@ class DashboardRFIListView(APIView):
                 return Response({"rfis": []}, status=status.HTTP_200_OK)
             rfis = RFI.objects.filter(project__company=user.company)
         else:
-            rfis = RFI.objects.filter(project__in=user.assigned_projects.all())
+            rfis = RFI.objects.filter(project__in=user.accessible_projects)
 
         if user.role == "technical_department":
             rfis = rfis.filter(assigned_to_technical_department=True)
@@ -930,7 +930,7 @@ class DashboardRFIListView(APIView):
             if project.company != user.company:
                 return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
         else:
-            if project not in user.assigned_projects.all():
+            if project not in user.accessible_projects:
                 return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
                 
         description = request.data.get('description', '')
@@ -1039,7 +1039,7 @@ class ProformaAccessListView(APIView):
                 return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
             project = Project.objects.filter(pk=pk, company=request.user.company).first()
         else:
-            project = request.user.assigned_projects.filter(pk=pk).first()
+            project = request.user.accessible_projects.filter(pk=pk).first()
 
         if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1055,7 +1055,7 @@ class ProformaAccessListView(APIView):
                 return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
             project = Project.objects.filter(pk=pk, company=request.user.company).first()
         else:
-            project = request.user.assigned_projects.filter(pk=pk).first()
+            project = request.user.accessible_projects.filter(pk=pk).first()
 
         if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1090,7 +1090,7 @@ class ProformaAccessDetailView(APIView):
                 return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
             project = Project.objects.filter(pk=pk, company=request.user.company).first()
         else:
-            project = request.user.assigned_projects.filter(pk=pk).first()
+            project = request.user.accessible_projects.filter(pk=pk).first()
 
         if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1115,7 +1115,7 @@ class ProformaAccessDetailView(APIView):
                 return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
             project = Project.objects.filter(pk=pk, company=request.user.company).first()
         else:
-            project = request.user.assigned_projects.filter(pk=pk).first()
+            project = request.user.accessible_projects.filter(pk=pk).first()
 
         if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1141,7 +1141,7 @@ class LoadingClearingAccessListView(APIView):
                 return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
             project = Project.objects.filter(pk=pk, company=request.user.company).first()
         else:
-            project = request.user.assigned_projects.filter(pk=pk).first()
+            project = request.user.accessible_projects.filter(pk=pk).first()
 
         if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1157,7 +1157,7 @@ class LoadingClearingAccessListView(APIView):
                 return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
             project = Project.objects.filter(pk=pk, company=request.user.company).first()
         else:
-            project = request.user.assigned_projects.filter(pk=pk).first()
+            project = request.user.accessible_projects.filter(pk=pk).first()
 
         if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1192,7 +1192,7 @@ class LoadingClearingAccessDetailView(APIView):
                 return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
             project = Project.objects.filter(pk=pk, company=request.user.company).first()
         else:
-            project = request.user.assigned_projects.filter(pk=pk).first()
+            project = request.user.accessible_projects.filter(pk=pk).first()
 
         if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1217,7 +1217,7 @@ class LoadingClearingAccessDetailView(APIView):
                 return Response({"error": "Admin has no associated company."}, status=status.HTTP_400_BAD_REQUEST)
             project = Project.objects.filter(pk=pk, company=request.user.company).first()
         else:
-            project = request.user.assigned_projects.filter(pk=pk).first()
+            project = request.user.accessible_projects.filter(pk=pk).first()
 
         if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)

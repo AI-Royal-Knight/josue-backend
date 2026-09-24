@@ -16,7 +16,7 @@ def check_project_access(user, project_id):
     if user.role in ["admin", "project_admin"]:
         from app.project_admin.models import Project
         return Project.objects.filter(id=project_id, company=user.company).exists()
-    return user.assigned_projects.filter(id=project_id).exists()
+    return user.accessible_projects.filter(id=project_id).exists()
 
 
 class VariationListCreateView(APIView):
@@ -35,7 +35,7 @@ class VariationListCreateView(APIView):
             )
         else:
             variations = Variation.objects.filter(
-                project__in=user.assigned_projects.all()
+                project__in=user.accessible_projects
             )
 
         variations = variations.select_related("project", "created_by", "approved_by").prefetch_related("lines")

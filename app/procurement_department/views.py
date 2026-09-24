@@ -48,7 +48,7 @@ class SupplierListView(APIView):
         
         if not company:
             # Fall back to suppliers linked to user's assigned projects' companies
-            company_ids = request.user.assigned_projects.values_list('company_id', flat=True)
+            company_ids = request.user.accessible_projects.values_list('company_id', flat=True)
             if not company_ids:
                 return Response([], status=status.HTTP_200_OK)
             suppliers = CompanySupplier.objects.select_related('supplier', 'supplier__user').filter(company_id__in=company_ids).distinct().order_by('-created_at')
@@ -328,7 +328,7 @@ class ProcurementProjectListView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         # Fetch projects the user is explicitly assigned to
-        projects = request.user.assigned_projects.all()
+        projects = request.user.accessible_projects
         if not projects.exists():
             return Response([], status=status.HTTP_200_OK)
             
@@ -377,7 +377,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
             queryset = Quotation.objects.filter(project__company=role_assignment.company)
             
         # Always include quotations for projects this user is explicitly assigned to
-        assigned_qs = Quotation.objects.filter(project__in=self.request.user.assigned_projects.all())
+        assigned_qs = Quotation.objects.filter(project__in=self.request.user.accessible_projects)
         
         return (queryset | assigned_qs).distinct()
 
@@ -775,7 +775,7 @@ class CallOffListViewSet(viewsets.GenericViewSet, viewsets.mixins.ListModelMixin
             user_qs = queryset.filter(quotation__project__company=role_assignment.company)
             
         # Include those assigned to user
-        assigned_qs = queryset.filter(quotation__project__in=self.request.user.assigned_projects.all())
+        assigned_qs = queryset.filter(quotation__project__in=self.request.user.accessible_projects)
         
         return (user_qs | assigned_qs).distinct().select_related(
             'quotation', 'quotation__project', 'quotation__main_folder', 
