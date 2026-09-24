@@ -1010,6 +1010,3 @@ class RequestAdminView(APIView):
             )
             
         return Response({"success": True, "message": "Your request has been submitted successfully."}, status=status.HTTP_201_CREATED)
-            )
-            
-        return Response({"success": True, "message": "Your request has been submitted successfully."}, status=status.HTTP_201_CREATED)
