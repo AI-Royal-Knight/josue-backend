@@ -882,9 +882,9 @@ class UsersListView(APIView):
                     )
 
             # Get or create UserProfile
-            try:
+            if hasattr(user, 'profile'):
                 profile = user.profile
-            except UserAccount.profile.RelatedObjectDoesNotExist:
+            else:
                 profile = UserProfile.objects.create(
                     user=user,
                     profession=user.role

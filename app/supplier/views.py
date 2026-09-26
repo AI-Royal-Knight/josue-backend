@@ -468,7 +468,7 @@ class SupplierCallOffListView(APIView):
                 Q(line_item__quotation__project__company=request.active_company) &
                 Q(line_item__quotation__supplier_email__icontains=request.user.email)
             )
-        ).distinct().order_by("-date")
+        ).filter(approved_by__isnull=False).distinct().order_by("-date")
 
         grouped: dict = {}
         for co in call_offs:

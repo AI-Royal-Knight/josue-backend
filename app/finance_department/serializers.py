@@ -19,6 +19,8 @@ class FinanceSupplierInvoiceSerializer(serializers.ModelSerializer):
     previous_month = serializers.SerializerMethodField()
     invoice_due_this_month = serializers.SerializerMethodField()
 
+    supplier_quote_pdf_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Quotation
         fields = (
@@ -27,7 +29,16 @@ class FinanceSupplierInvoiceSerializer(serializers.ModelSerializer):
             'date_scheduled', 'release_date', 'finance_comments', 'procurement_comments',
             'commercial_comments', 'supplier_name', 'credit_limit', 'eom_payment_terms',
             'month_credit_used', 'available_credit', 'previous_month', 'invoice_due_this_month',
+            'supplier_quote_pdf_url',
         )
+
+    def get_supplier_quote_pdf_url(self, obj):
+        if obj.supplier_quote_pdf:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.supplier_quote_pdf.url)
+            return obj.supplier_quote_pdf.url
+        return None
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_supplier_name(self, obj):

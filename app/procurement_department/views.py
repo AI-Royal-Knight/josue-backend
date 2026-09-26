@@ -254,7 +254,7 @@ class ProcurementSupplierInvoiceListView(APIView):
             invoices = SupplierInvoice.objects.select_related(
                 "company", "company_supplier", "company_supplier__supplier", "company_supplier__supplier__user"
             ).all().order_by("-created_at")
-            return Response(ProcurementSupplierInvoiceSerializer(invoices, many=True).data, status=status.HTTP_200_OK)
+            return Response(ProcurementSupplierInvoiceSerializer(invoices, many=True, context={'request': request}).data, status=status.HTTP_200_OK)
         else:
             role_assignment = RoleAssignment.objects.filter(user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT).first()
             if role_assignment and role_assignment.company:
@@ -269,7 +269,7 @@ class ProcurementSupplierInvoiceListView(APIView):
             "company", "company_supplier", "company_supplier__supplier", "company_supplier__supplier__user"
         ).filter(company=company).order_by("-created_at")
 
-        serializer = ProcurementSupplierInvoiceSerializer(invoices, many=True)
+        serializer = ProcurementSupplierInvoiceSerializer(invoices, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -314,7 +314,7 @@ class ProcurementSupplierInvoiceDetailView(APIView):
         invoice.processed_at = timezone.now()
         invoice.save()
 
-        return Response(ProcurementSupplierInvoiceSerializer(invoice).data, status=status.HTTP_200_OK)
+        return Response(ProcurementSupplierInvoiceSerializer(invoice, context={'request': request}).data, status=status.HTTP_200_OK)
 
 class ProcurementProjectListView(APIView):
 
@@ -406,6 +406,63 @@ class QuotationViewSet(viewsets.ModelViewSet):
         quotation.date_po_created = timezone.now().date()
         quotation.save(update_fields=['status', 'quote_total', 'fully_approved', 'po_created', 'date_po_created'])
         
+        # Send PO email to supplier
+        try:
+            from .pdf_utils import generate_quotation_pdf
+            from django.core.mail import EmailMessage
+            from core.utils import get_frontend_url, get_default_from_email
+            import os
+            
+            logo_path = None
+            company = request.user.company
+            if not company or not company.company_logo:
+                from app.account.models import Company
+                company = Company.objects.exclude(company_logo='').first()
+
+            if company and company.company_logo:
+                try:
+                    logo_path = company.company_logo.path
+                except Exception:
+                    pass
+                    
+            if not logo_path:
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                candidate = os.path.join(base_dir, "app", "static", "logo.png")
+                if os.path.exists(candidate):
+                    logo_path = candidate
+                    
+            pdf_bytes = generate_quotation_pdf(quotation, logo_path=logo_path)
+            
+            email_to = quotation.supplier_email
+            if not email_to and quotation.supplier and quotation.supplier.supplier:
+                email_to = quotation.supplier.supplier.user.email
+                
+            if email_to:
+                frontend_url = get_frontend_url(getattr(self, 'request', None))
+                portal_link = f"{frontend_url}/supplier"
+                
+                subject = f"Purchase Order Created: {quotation.quote_ref}"
+                message = (
+                    f"Hello,\n\n"
+                    f"Your quotation has been approved and a Purchase Order ({quotation.quote_ref}) has been created.\n"
+                    f"Please find the PO attached.\n\n"
+                    f"You can view your POs and submit Call Offs or Invoices via your Supplier Portal:\n"
+                    f"{portal_link}\n\n"
+                    f"Thank you."
+                )
+                
+                email = EmailMessage(
+                    subject,
+                    message,
+                    get_default_from_email(),
+                    [email_to]
+                )
+                email.attach(f"PurchaseOrder_{quotation.quote_ref}.pdf", pdf_bytes, "application/pdf")
+                email.send(fail_silently=True)
+                
+        except Exception as e:
+            print(f"Error sending PO email: {e}")
+
         serializer = self.get_serializer(quotation)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -860,6 +917,9 @@ class ApproveCallOffView(APIView):
         
         # Prepare Email
         supplier_email = quotation.supplier_email
+        if not supplier_email and quotation.supplier and quotation.supplier.supplier:
+            supplier_email = quotation.supplier.supplier.user.email
+            
         if supplier_email:
             context = {
                 'call_off_ref': call_off.call_off_ref,
@@ -888,7 +948,7 @@ class ApproveCallOffView(APIView):
                 print(f"Error sending email: {e}")
                 # Even if email fails, we consider it approved
         
-            return Response({"detail": "Approved successfully."}, status=status.HTTP_200_OK)
+        return Response({"detail": "Approved successfully."}, status=status.HTTP_200_OK)
 
 class ApproveAllCallOffsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -942,6 +1002,9 @@ class ApproveAllCallOffsView(APIView):
         
         # Prepare Email
         supplier_email = quotation.supplier_email
+        if not supplier_email and quotation.supplier and quotation.supplier.supplier:
+            supplier_email = quotation.supplier.supplier.user.email
+            
         if supplier_email:
             # We'll pass the list of call_offs to the template
             context = {
