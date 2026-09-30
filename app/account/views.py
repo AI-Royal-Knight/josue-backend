@@ -84,7 +84,8 @@ class ProfileView(APIView):
         else:
             profile_data = profile_data_raw
             
-        if profile_data:
+        has_profile_files = 'passport_document' in request.FILES
+        if profile_data or has_profile_files:
             try:
                 profile = user.profile
             except Exception:
@@ -119,7 +120,8 @@ class ProfileView(APIView):
         else:
             company_data = company_data_raw
             
-        if company_data:
+        has_company_files = any(f in request.FILES for f in ['public_liability_document', 'employers_liability_document', 'company_logo'])
+        if company_data or has_company_files:
             if not user.company:
                 from .models import Company
                 company = Company.objects.create()
