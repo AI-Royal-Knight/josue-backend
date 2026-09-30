@@ -122,13 +122,33 @@ class ProfileView(APIView):
             
         has_company_files = any(f in request.FILES for f in ['public_liability_document', 'employers_liability_document', 'company_logo'])
         if company_data or has_company_files:
+            from .models import Company, RoleAssignment
+            company_name = company_data.get('company_name', '').strip() if company_data else ''
+
             if not user.company:
-                from .models import Company
-                company = Company.objects.create()
+                if company_name:
+                    company = Company.objects.filter(company_name__iexact=company_name).first()
+                    if not company:
+                        company = Company.objects.create(company_name=company_name)
+                else:
+                    company = Company.objects.create()
                 user.company = company
                 user.save()
-            
+            elif company_name and user.company.company_name != company_name:
+                company = Company.objects.filter(company_name__iexact=company_name).first()
+                if not company:
+                    company = Company.objects.create(company_name=company_name)
+                user.company = company
+                user.save()
+
             company = user.company
+            if company:
+                RoleAssignment.objects.get_or_create(
+                    user=user,
+                    role=user.role or 'employee',
+                    company=company,
+                    defaults={'project': None}
+                )
             for field in [
                 'company_name', 'company_number', 'building_number', 'street', 'town', 'city', 'postcode',
                 'vat_number', 'phone', 'utr', 'bank_name', 'bank_address', 'sort_code', 'account_number',
