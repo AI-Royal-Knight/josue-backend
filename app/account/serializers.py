@@ -41,8 +41,21 @@ class UserSerializer(serializers.ModelSerializer):
             'secondary_role',
             'profile',
             'company',
+            'assigned_companies',
             'stats'
         ]
+        
+    assigned_companies = serializers.SerializerMethodField()
+
+    @extend_schema_field(CompanySerializer(many=True))
+    def get_assigned_companies(self, obj):
+        from .models import RoleAssignment, Company
+        company_ids = RoleAssignment.objects.filter(user=obj).values_list('company_id', flat=True).distinct()
+        companies = Company.objects.filter(id__in=company_ids, activate=True)
+        # Also include the user's primary company if it's active and not in the list
+        if obj.company and obj.company.activate and obj.company.id not in company_ids:
+            companies = companies | Company.objects.filter(id=obj.company.id)
+        return CompanySerializer(companies, many=True).data
         
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_stats(self, obj):
