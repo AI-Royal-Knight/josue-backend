@@ -45,6 +45,38 @@ ROLE_TO_BY_FIELD = {
 
 def _serialize_invoice(inv: UserInvoice) -> dict:
     user = inv.created_by
+    sort_code = ""
+    account_number = ""
+    bank_name = ""
+    bank_address = ""
+    utr = ""
+    ni_number = ""
+    address = ""
+    vat_number = ""
+    
+    if user:
+        if hasattr(user, 'profile'):
+            profile = user.profile
+            sort_code = profile.sort_code or ""
+            account_number = profile.account_number or ""
+            bank_name = profile.bank_name or ""
+            bank_address = profile.bank_address or ""
+            utr = profile.utr or ""
+            ni_number = profile.ni_number or ""
+            
+        # Try to get address/VAT from the user's primary company if they have one and they are not just an employee of the contractor
+        # In this system, user.company is their primary company (often the one they created or were invited to)
+        if user.company:
+            vat_number = user.company.vat_number or ""
+            address_parts = [
+                str(user.company.building_number) if user.company.building_number else "",
+                user.company.street or "",
+                user.company.town or "",
+                user.company.city or "",
+                user.company.postcode or ""
+            ]
+            address = ", ".join(p for p in address_parts if p)
+
     return {
         "id": str(inv.id),
         "invoiceNumber": inv.invoice_number,
@@ -58,8 +90,14 @@ def _serialize_invoice(inv: UserInvoice) -> dict:
         "sourceType": inv.source_type,
         "createdBy": user.full_name if user and user.full_name else (user.email if user else ""),
         "userName": user.full_name if user and user.full_name else (user.email if user else ""),
-        "sortCode": getattr(user, "sort_code", "") or "" if user else "",
-        "accountNumber": getattr(user, "account_number", "") or "" if user else "",
+        "sortCode": sort_code,
+        "accountNumber": account_number,
+        "bankName": bank_name,
+        "bankAddress": bank_address,
+        "utr": utr,
+        "niNumber": ni_number,
+        "address": address,
+        "vatNumber": vat_number,
         "total": f"£{inv.total:,.2f}",
         "totalRaw": float(inv.total),
         # Approval chain

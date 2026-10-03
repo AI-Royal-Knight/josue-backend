@@ -10,7 +10,7 @@ from drf_spectacular.utils import extend_schema
 from app.account.models import UserAccount, Invitation
 from app.super_admin.models import RecentActivity
 from core.utils import get_frontend_url, get_default_from_email
-from .serializers import InviteEmployeeSerializer, ApproveEmployeeSerializer
+from .serializers import InviteEmployeeSerializer, ApproveEmployeeSerializer, RevokeEmployeeSerializer
 
 def _first_error(serializer) -> str:
     """Extract the first human-readable error from serializer.errors."""
@@ -121,3 +121,41 @@ class ApproveEmployeeView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+
+class RevokeEmployeeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=RevokeEmployeeSerializer, responses={200: dict})
+    def post(self, request):
+        if request.user.role not in [UserAccount.Role.DOCUMENT_CONTROLLER, UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN]:
+            return Response({"error": "You do not have permission to revoke employees."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = RevokeEmployeeSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user_id = serializer.validated_data["user_id"]
+
+        try:
+            user = UserAccount.objects.get(id=user_id)
+            
+            # Find the role assignment for the revoking user's company
+            from app.account.models import RoleAssignment
+            company = request.user.company
+            
+            if company:
+                assignment = RoleAssignment.objects.filter(user=user, company=company).first()
+                if assignment:
+                    assignment.delete()
+                
+                # Also reset their profile approval for this company (if they were approved)
+                # Since UserProfile is 1-1, revoking them removes them from this company's view.
+                # If they try to log in, this company will no longer be an option in their assigned_companies list.
+            
+            RecentActivity.objects.create(activity_name=f"User {user.email} was revoked by {request.user.get_role_display()} from company {company.company_name if company else 'Unknown'}.")
+
+            return Response({"success": True, "message": "Employee revoked successfully."})
+        except UserAccount.DoesNotExist:
+            return Response({"error": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

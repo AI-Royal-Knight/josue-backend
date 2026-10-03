@@ -1,4 +1,8 @@
-.PHONY: run migrate makemigrations shell dbshell superuser collectstatic test lint format check install
+.PHONY: run migrate makemigrations shell dbshell superuser collectstatic test lint format check install seed
+
+# Seed comprehensive demo data
+seed:
+	uv run python manage.py seed_demo_data
 
 # Run development server
 run:

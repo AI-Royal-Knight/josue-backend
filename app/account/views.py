@@ -120,7 +120,7 @@ class ProfileView(APIView):
         else:
             company_data = company_data_raw
             
-        has_company_files = any(f in request.FILES for f in ['public_liability_document', 'employers_liability_document', 'company_logo'])
+        has_company_files = any(f in request.FILES for f in ['public_liability_document', 'employers_liability_document', 'company_logo', 'attachment'])
         if company_data or has_company_files:
             from .models import Company, RoleAssignment
             company_name = company_data.get('company_name', '').strip() if company_data else ''
@@ -147,7 +147,7 @@ class ProfileView(APIView):
                     user=user,
                     role=user.role or 'employee',
                     company=company,
-                    defaults={'project': None}
+                    project=None
                 )
             for field in [
                 'company_name', 'company_number', 'building_number', 'street', 'town', 'city', 'postcode',
@@ -167,6 +167,8 @@ class ProfileView(APIView):
                 company.employers_liability_document = request.FILES['employers_liability_document']
             if 'company_logo' in request.FILES:
                 company.company_logo = request.FILES['company_logo']
+            if 'attachment' in request.FILES:
+                company.attachment = request.FILES['attachment']
                 
             company.save()
 
@@ -798,9 +800,9 @@ class UsersListView(APIView):
             pass  # Super admin sees everyone across all companies
         elif caller_role == UserAccount.Role.ADMIN:
             if request.user.company and request.user.company.company_name:
-                users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role=UserAccount.Role.SUPER_ADMIN)
+                users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
             else:
-                users = users.filter(company=request.user.company).exclude(role=UserAccount.Role.SUPER_ADMIN)
+                users = users.filter(company=request.user.company).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
         elif caller_role == UserAccount.Role.DOCUMENT_CONTROLLER:
             # Document controllers only manage employee (mobile app) users — scoped to their company
             if request.user.company and request.user.company.company_name:

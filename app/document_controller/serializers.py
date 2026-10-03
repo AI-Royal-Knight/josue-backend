@@ -9,3 +9,5 @@ class ApproveEmployeeSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
     approved = serializers.BooleanField()
 
+class RevokeEmployeeSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()

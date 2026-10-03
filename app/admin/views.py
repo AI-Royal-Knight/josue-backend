@@ -7,7 +7,7 @@ from rest_framework import status
 from core.utils import get_frontend_url, get_default_from_email
 
 from app.account.permissions import IsAdmin
-from app.account.models import UserAccount
+from app.account.models import UserAccount, UserProfile
 from app.project_admin.models import Project
 
 from .serializers import AdminProfileSerializer, AdminProfileUpdateSerializer
@@ -23,10 +23,10 @@ class HomeView(APIView):
 
         company = request.user.company
         if company and company.company_name:
-            total_users = UserAccount.objects.filter(company__company_name__iexact=company.company_name).count()
+            total_users = UserAccount.objects.filter(company__company_name__iexact=company.company_name).exclude(role__in=[UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN]).count()
             active_projects = Project.objects.filter(company__company_name__iexact=company.company_name, is_completed=False).count()
         else:
-            total_users = UserAccount.objects.filter(company=company).count()
+            total_users = UserAccount.objects.filter(company=company).exclude(role__in=[UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN]).count()
             active_projects = Project.objects.filter(company=company, is_completed=False).count()
 
         return Response({
@@ -116,8 +116,13 @@ class ProjectAdminsView(APIView):
                     last_name=data["last_name"],
                     role=UserAccount.Role.PROJECT_ADMIN,
                     company=request.user.company,
-                    is_active=False,
+                    is_active=True,
                 )
+
+            profile, _ = UserProfile.objects.get_or_create(user=project_admin_user)
+            profile.is_approved = True
+            profile.approved_by = request.user
+            profile.save()
 
             if "project_ids" in data and data["project_ids"]:
                 projects = Project.objects.filter(id__in=data["project_ids"], company=request.user.company)
@@ -229,8 +234,13 @@ class ManagingDirectorsView(APIView):
                     last_name=data["last_name"],
                     role=UserAccount.Role.MANAGING_DIRECTOR,
                     company=request.user.company,
-                    is_active=False,
+                    is_active=True,
                 )
+
+            profile, _ = UserProfile.objects.get_or_create(user=md_user)
+            profile.is_approved = True
+            profile.approved_by = request.user
+            profile.save()
 
             invitation = CompanyInvitation.objects.create(
                 company=request.user.company,
