@@ -179,6 +179,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "project_name",
             "job_code",
             "vat_rate",
+            "currency",
             "address",
             "created_at",
             "project_value",
@@ -195,6 +196,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "total_unclaimed",
             "total_overspend",
             "is_user_clock_in_enabled",
+            "monthly_application_date",
         ]
 
 
@@ -205,6 +207,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             "project_name",
             "job_code",
             "vat_rate",
+            "currency",
             "address",
             "project_value",
             "material_estimate",
@@ -213,6 +216,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             "start_date",
             "completion_date",
             "is_completed",
+            "monthly_application_date",
         ]
 
 
@@ -223,6 +227,7 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
             "project_name",
             "job_code",
             "vat_rate",
+            "currency",
             "address",
             "project_value",
             "material_estimate",
@@ -231,6 +236,7 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
             "start_date",
             "completion_date",
             "is_completed",
+            "monthly_application_date",
         ]
 
 

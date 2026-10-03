@@ -472,7 +472,12 @@ class CompanyUsersView(APIView):
             company_query |= Q(company__company_number=company.company_number)
             
         users = UserAccount.objects.filter(company_query).exclude(
-            role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN]
+            role__in=[
+                UserAccount.Role.SUPER_ADMIN, 
+                UserAccount.Role.ADMIN,
+                UserAccount.Role.PROJECT_ADMIN,
+                UserAccount.Role.MANAGING_DIRECTOR
+            ]
         ).distinct()
         role_param = request.query_params.get("role")
         if role_param:

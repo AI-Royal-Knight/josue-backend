@@ -19,6 +19,7 @@ class CompanyListSerializer(serializers.ModelSerializer):
     storage_usage = serializers.SerializerMethodField()
     uploaded_files_count = serializers.SerializerMethodField()
     admin_is_active = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = Company
@@ -61,6 +62,13 @@ class CompanyListSerializer(serializers.ModelSerializer):
         if obj.company_name:
             return Project.objects.filter(company__company_name__iexact=obj.company_name.strip()).count()
         return Project.objects.filter(company=obj).count()
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_user(self, obj):
+        from app.account.models import UserAccount
+        if obj.company_name:
+            return UserAccount.objects.filter(company__company_name__iexact=obj.company_name.strip()).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
+        return UserAccount.objects.filter(company=obj).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
 
     @extend_schema_field(serializers.IntegerField())
     def get_invoices_count(self, obj):

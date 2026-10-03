@@ -898,8 +898,8 @@ class UsersListView(APIView):
                         status=status.HTTP_403_FORBIDDEN,
                     )
             else:
-                # For all other roles, only admin or super_admin can approve
-                if caller_role not in [UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN]:
+                # For all other roles, only admin, super_admin, or project_admin can approve
+                if caller_role not in [UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN, UserAccount.Role.PROJECT_ADMIN]:
                     return Response(
                         {"error": "You do not have permission to approve this user."},
                         status=status.HTTP_403_FORBIDDEN,

@@ -25,6 +25,11 @@ class Project(BaseModel):
         null=True,
     )
 
+    currency = models.CharField(
+        max_length=10,
+        default="GBP",
+    )
+
     address = models.CharField(max_length=500, blank=True, null=True)
 
     project_value = models.DecimalField(

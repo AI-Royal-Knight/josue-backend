@@ -530,3 +530,74 @@ class MonthlyInvoiceDetailView(APIView):
         serializer = MonthlyInvoiceListSerializer(invoice)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+class ResendMonthlyInvoiceView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    @extend_schema(responses={200: dict, 404: dict})
+    def post(self, request, pk):
+        try:
+            invoice = MonthlyInvoice.objects.get(pk=pk)
+        except MonthlyInvoice.DoesNotExist:
+            return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+        from app.super_admin.tasks import generate_and_send_monthly_invoices
+        generate_and_send_monthly_invoices(
+            company_id=invoice.company_id,
+            force=True,
+            target_year=invoice.year,
+            target_month=invoice.month
+        )
+        return Response({"message": "Invoice resent successfully."}, status=status.HTTP_200_OK)
+
+from django.http import HttpResponse
+import io
+from xhtml2pdf import pisa
+from django.template.loader import render_to_string
+from django.utils import timezone
+from decimal import Decimal
+
+class MonthlyInvoicePdfView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request, pk):
+        try:
+            invoice = MonthlyInvoice.objects.get(pk=pk)
+        except MonthlyInvoice.DoesNotExist:
+            return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        company = invoice.company
+        now = timezone.now()
+        
+        monthly_sub = company.monthly_subscription or Decimal("0.00")
+        per_user = company.per_user_rate or Decimal("0.00")
+        from app.account.models import UserAccount
+        users = UserAccount.objects.filter(company=company).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
+
+        subtotal = monthly_sub + (per_user * users)
+        vat_rate_decimal = Decimal("0.20")
+        vat_amount = subtotal * vat_rate_decimal
+        total_amount = subtotal + vat_amount
+
+        html_string = render_to_string("super_admin/invoice_pdf.html", {
+            "company": company,
+            "invoice": invoice,
+            "subtotal": subtotal,
+            "vat_amount": vat_amount,
+            "total_amount": total_amount,
+            "monthly_sub": monthly_sub,
+            "per_user": per_user,
+            "users": users,
+            "user_licenses_total": per_user * users,
+            "date": now.strftime("%B %d, %Y"),
+        })
+        
+        pdf_file = io.BytesIO()
+        pisa_status = pisa.CreatePDF(io.StringIO(html_string), dest=pdf_file)
+        
+        if pisa_status.err:
+            return Response({"error": "Failed to generate PDF"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        response = HttpResponse(pdf_file.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="invoice_{invoice.invoice_number}.pdf"'
+        return response
+

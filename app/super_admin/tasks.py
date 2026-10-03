@@ -44,9 +44,14 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
             # Generate invoice
             monthly_sub = company.monthly_subscription or Decimal("0.00")
             per_user = company.per_user_rate or Decimal("0.00")
-            users = company.user or 0
+            
+            from app.account.models import UserAccount
+            users = UserAccount.objects.filter(company=company).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
 
-            total_amount = monthly_sub + (per_user * users)
+            subtotal = monthly_sub + (per_user * users)
+            vat_rate_decimal = Decimal("0.20")
+            vat_amount = subtotal * vat_rate_decimal
+            total_amount = subtotal + vat_amount
             invoice_number = f"INV-{year}{month:02d}-{str(company.id)[:4].upper()}"
 
             invoice, created = MonthlyInvoice.objects.get_or_create(
@@ -66,6 +71,8 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
                 html_string = render_to_string("super_admin/invoice_pdf.html", {
                     "company": company,
                     "invoice": invoice,
+                    "subtotal": subtotal,
+                    "vat_amount": vat_amount,
                     "total_amount": total_amount,
                     "monthly_sub": monthly_sub,
                     "per_user": per_user,

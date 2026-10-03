@@ -9,6 +9,8 @@ from .views import (
     MonthlyInvoiceView,
     MonthlyInvoiceDetailView,
     ResendCompanyInvitationView,
+    ResendMonthlyInvoiceView,
+    MonthlyInvoicePdfView,
 )
 
 urlpatterns = [
@@ -21,4 +23,6 @@ urlpatterns = [
     path('invitations/accept/', AcceptCompanyInvitationView.as_view(), name='Accept Company Invitation'),
     path('invoices/', MonthlyInvoiceView.as_view(), name='Monthly Invoices'),
     path('invoices/<uuid:pk>/', MonthlyInvoiceDetailView.as_view(), name='Monthly Invoice Detail'),
+    path('invoices/<uuid:pk>/resend/', ResendMonthlyInvoiceView.as_view(), name='Resend Monthly Invoice'),
+    path('invoices/<uuid:pk>/pdf/', MonthlyInvoicePdfView.as_view(), name='Monthly Invoice PDF'),
 ]

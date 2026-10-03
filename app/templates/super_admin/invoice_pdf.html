@@ -139,10 +139,14 @@
                 <table class="summary-table">
                     <tr>
                         <td>Subtotal:</td>
-                        <td>£{{ total_amount|floatformat:2 }}</td>
+                        <td>£{{ subtotal|floatformat:2 }}</td>
+                    </tr>
+                    <tr>
+                        <td>VAT (20%):</td>
+                        <td>£{{ vat_amount|floatformat:2 }}</td>
                     </tr>
                     <tr class="total-row">
-                        <td>Total Due (plus VAT):</td>
+                        <td>Total Due:</td>
                         <td>£{{ total_amount|floatformat:2 }}</td>
                     </tr>
                 </table>
