@@ -23,10 +23,10 @@ class HomeView(APIView):
 
         company = request.user.company
         if company and company.company_name:
-            total_users = UserAccount.objects.filter(company__company_name__iexact=company.company_name).exclude(role__in=[UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN]).count()
+            total_users = UserAccount.objects.filter(company__company_name__iexact=company.company_name).exclude(role__in=[UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN, UserAccount.Role.PROJECT_ADMIN]).count()
             active_projects = Project.objects.filter(company__company_name__iexact=company.company_name, is_completed=False).count()
         else:
-            total_users = UserAccount.objects.filter(company=company).exclude(role__in=[UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN]).count()
+            total_users = UserAccount.objects.filter(company=company).exclude(role__in=[UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN, UserAccount.Role.PROJECT_ADMIN]).count()
             active_projects = Project.objects.filter(company=company, is_completed=False).count()
 
         return Response({
@@ -105,6 +105,7 @@ class ProjectAdminsView(APIView):
                 existing_user.last_name = data["last_name"]
                 existing_user.role = UserAccount.Role.PROJECT_ADMIN
                 existing_user.company = request.user.company
+                existing_user.is_active = True
                 existing_user.save()
                 project_admin_user = existing_user
                 
@@ -223,6 +224,7 @@ class ManagingDirectorsView(APIView):
                 existing_user.last_name = data["last_name"]
                 existing_user.role = UserAccount.Role.MANAGING_DIRECTOR
                 existing_user.company = request.user.company
+                existing_user.is_active = True
                 existing_user.save()
                 md_user = existing_user
                 

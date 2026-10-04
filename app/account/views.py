@@ -800,9 +800,9 @@ class UsersListView(APIView):
             pass  # Super admin sees everyone across all companies
         elif caller_role == UserAccount.Role.ADMIN:
             if request.user.company and request.user.company.company_name:
-                users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
+                users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN, UserAccount.Role.PROJECT_ADMIN])
             else:
-                users = users.filter(company=request.user.company).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
+                users = users.filter(company=request.user.company).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN, UserAccount.Role.PROJECT_ADMIN])
         elif caller_role == UserAccount.Role.DOCUMENT_CONTROLLER:
             # Document controllers only manage employee (mobile app) users — scoped to their company
             if request.user.company and request.user.company.company_name:
@@ -821,6 +821,9 @@ class UsersListView(APIView):
                 users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
             else:
                 users = users.filter(company=request.user.company).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
+
+        # Exclude the currently logged in user so they don't appear in their own user list
+        users = users.exclude(id=request.user.id)
 
         result = []
         for u in users:
