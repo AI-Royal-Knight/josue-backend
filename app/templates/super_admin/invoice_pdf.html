@@ -23,30 +23,30 @@
         
         .header-left {
             width: 50%;
-            background-color: #0f172a;
+            background-color: #111827;
             color: #ffffff;
             padding: 15px 30px;
-            font-size: 24pt;
+            font-size: 32pt;
             font-weight: bold;
+            letter-spacing: -1px;
         }
         
         .header-right {
             width: 50%;
-            background-color: #26c292;
-            color: #000000;
+            background-color: #1bc39a;
+            color: #111827;
             padding: 15px 30px;
             text-align: right;
-            font-size: 20pt;
+            font-size: 28pt;
             font-weight: bold;
         }
 
         .header-sub-strip {
-            width: 100%;
-            background-color: #f1fcf8;
+            background-color: #f0fdf8;
             padding: 5px 30px;
             text-align: right;
             font-size: 9pt;
-            color: #000000;
+            color: #111827;
         }
 
         .content {
@@ -54,7 +54,7 @@
         }
 
         .section-title {
-            color: #21a884;
+            color: #1bc39a;
             font-size: 10pt;
             font-weight: bold;
             text-transform: uppercase;
@@ -74,9 +74,9 @@
         }
 
         .meta-value-yellow {
-            background-color: #fff6cc;
-            padding: 2px 5px;
-            border-bottom: 1px solid #e2d194;
+            background-color: #fff9d6;
+            padding: 4px 6px;
+            border-bottom: 1px solid #f0e6b3;
         }
         
         .meta-value {
@@ -84,10 +84,9 @@
         }
 
         .bill-to-yellow {
-            background-color: #fff6cc;
+            background-color: #fff9d6;
             padding: 6px 10px;
-            width: 100%;
-            border-bottom: 1px solid #e2d194;
+            border-bottom: 1px solid #f0e6b3;
             color: #886a08;
             font-weight: bold;
         }
@@ -100,7 +99,7 @@
         }
 
         .items-table th {
-            background-color: #0f172a;
+            background-color: #111827;
             color: #ffffff;
             font-size: 9pt;
             padding: 6px 10px;
@@ -114,7 +113,7 @@
 
         .items-table td {
             padding: 6px 10px;
-            border-bottom: 1px dotted #cccccc;
+            border-bottom: 1px dotted #e5e7eb;
             font-size: 10pt;
         }
 
@@ -148,8 +147,8 @@
         }
 
         .total-row td {
-            background-color: #26c292;
-            color: #000000;
+            background-color: #1bc39a;
+            color: #111827;
             font-weight: bold;
             padding: 8px 10px;
         }
@@ -164,7 +163,7 @@
             font-weight: bold;
             font-size: 10pt;
             margin-bottom: 5px;
-            border-bottom: 1px solid #26c292;
+            border-bottom: 1px solid #1bc39a;
             padding-bottom: 5px;
         }
         
@@ -234,9 +233,13 @@
 
         <!-- Bill To -->
         <div class="section-title">BILL TO</div>
-        <div class="bill-to-yellow">
-            {{ company.company_name }}
-        </div>
+        <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="bill-to-yellow">
+                    {{ company.company_name }}
+                </td>
+            </tr>
+        </table>
         {% if company.admin_name %}
         <div style="padding: 5px 10px;">
             {{ company.admin_name }} {{ company.admin_surname }}<br>
