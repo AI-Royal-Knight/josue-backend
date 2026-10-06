@@ -6,160 +6,322 @@
     <style>
         @page {
             size: a4 portrait;
-            margin: 1.5cm;
+            margin: 0cm; /* Edge to edge header */
         }
         body { 
-            font-family: Arial, Helvetica, sans-serif; 
+            font-family: Helvetica, Arial, sans-serif; 
             font-size: 10pt; 
             color: #000000; 
-            line-height: 1.4; 
+            margin: 0;
+            padding: 0;
+        }
+
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
         }
         
-        .header-table { width: 100%; border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 20px; }
-        .invoice-title { font-size: 24pt; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; text-align: right; }
-        .company-from { font-size: 10pt; }
-        .invoice-meta { text-align: right; font-size: 10pt; }
-        
-        .bill-to-table { width: 100%; margin-bottom: 30px; }
-        .section-title { font-size: 10pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000000; margin-bottom: 5px; width: 60%; }
-        
-        .items-table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-bottom: 20px; 
-        }
-        .items-table th { 
-            border-bottom: 2px solid #000000; 
-            font-size: 10pt; 
+        .header-left {
+            width: 50%;
+            background-color: #0f172a;
+            color: #ffffff;
+            padding: 20px 30px;
+            font-size: 28pt;
             font-weight: bold;
-            padding: 8px 5px; 
-            text-align: left; 
-        }
-        .items-table th.right, .items-table td.right { text-align: right; }
-        .items-table td { 
-            padding: 8px 5px; 
-            border-bottom: 1px solid #dddddd; 
-            font-size: 10pt; 
-            vertical-align: top;
         }
         
-        .summary-table { width: 100%; border-collapse: collapse; }
-        .summary-table td { 
-            padding: 8px 5px; 
-            text-align: right; 
-            font-size: 10pt; 
+        .header-right {
+            width: 50%;
+            background-color: #26c292;
+            color: #000000;
+            padding: 20px 30px;
+            text-align: right;
+            font-size: 24pt;
+            font-weight: bold;
         }
-        .total-row td { 
-            font-weight: bold; 
-            border-top: 2px solid #000000; 
+
+        .header-sub-strip {
+            width: 100%;
+            background-color: #f1fcf8;
+            padding: 5px 30px;
+            text-align: right;
+            font-size: 9pt;
+            color: #000000;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section-title {
+            color: #21a884;
+            font-size: 11pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
         }
         
-        .footer { 
-            margin-top: 40px; 
-            font-size: 9pt; 
+        .meta-label {
+            color: #5c6c7b;
+            font-weight: bold;
+            font-size: 9.5pt;
+            padding: 4px 10px 4px 0;
         }
+
+        .meta-value-yellow {
+            background-color: #fff6cc;
+            padding: 4px 5px;
+            border-bottom: 1px solid #e2d194;
+        }
+        
+        .meta-value {
+            padding: 4px 5px;
+        }
+
+        .bill-to-yellow {
+            background-color: #fff6cc;
+            padding: 6px 10px;
+            width: 100%;
+            border-bottom: 1px solid #e2d194;
+            color: #886a08;
+            font-weight: bold;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 30px;
+            margin-bottom: 40px;
+        }
+
+        .items-table th {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-size: 9pt;
+            padding: 8px 10px;
+            text-align: left;
+            text-transform: uppercase;
+        }
+        
+        .items-table th.right, .items-table td.right {
+            text-align: right;
+        }
+
+        .items-table td {
+            padding: 8px 10px;
+            border-bottom: 1px dotted #cccccc;
+            font-size: 10pt;
+        }
+
+        .bottom-table {
+            width: 100%;
+        }
+
+        .payment-label {
+            color: #5c6c7b;
+            font-weight: bold;
+            font-size: 9.5pt;
+            padding: 3px 10px 3px 0;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .summary-table td {
+            padding: 5px 10px;
+            text-align: right;
+            font-size: 10pt;
+            font-weight: bold;
+        }
+        
+        .total-row td {
+            background-color: #26c292;
+            color: #000000;
+            font-weight: bold;
+            padding: 8px 10px;
+        }
+
+        .footer {
+            margin-top: 50px;
+            padding-top: 15px;
+            text-align: center;
+        }
+
+        .footer-line-1 {
+            font-weight: bold;
+            font-size: 10pt;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #26c292;
+            padding-bottom: 5px;
+        }
+        
+        .footer-line-2 {
+            font-size: 8pt;
+            color: #5c6c7b;
+            border-bottom: 1px solid #4a6fa5;
+            padding-bottom: 10px;
+        }
+
     </style>
 </head>
 <body>
 
-    <table class="header-table">
+    <!-- Header area -->
+    <table cellpadding="0" cellspacing="0" class="header-table">
         <tr>
-            <td width="50%" valign="top">
-                <img src="/Users/thatsayon/Codes/Josue/backend/core/images/LOGO Gotham font.png" style="height: 60px;" />
-                <div style="margin-top: 15px;" class="company-from">
-                    <strong>Estrada Building Services</strong><br>
-                    Billing Department<br>
-                    support@tresta.com
-                </div>
-            </td>
-            <td width="50%" valign="top" class="invoice-meta">
-                <div class="invoice-title">INVOICE</div>
-                <div style="margin-top: 15px;">
-                    <strong>Invoice Number:</strong> {{ invoice.invoice_number }}<br>
-                    <strong>Date of Issue:</strong> {{ date }}
-                </div>
-            </td>
+            <td class="header-left" valign="middle">tresta</td>
+            <td class="header-right" valign="middle">INVOICE</td>
         </tr>
     </table>
-
-    <table class="bill-to-table">
-        <tr>
-            <td width="50%" valign="top">
-                <div class="section-title">BILLED TO</div>
-                <strong>{{ company.company_name }}</strong><br>
-                {% if company.admin_name %}
-                {{ company.admin_name }} {{ company.admin_surname }}<br>
-                {% endif %}
-                {% if company.admin_email %}
-                {{ company.admin_email }}
-                {% endif %}
-            </td>
-            <td width="50%" valign="top">
-            </td>
-        </tr>
-    </table>
-
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th>Description</th>
-                <th class="right">Qty</th>
-                <th class="right">Unit Price</th>
-                <th class="right">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>
-                    <strong>Monthly Platform Subscription</strong><br>
-                    <span style="font-size: 9pt; color: #555555;">Base access for the billing period</span>
-                </td>
-                <td class="right">1</td>
-                <td class="right">£{{ monthly_sub|floatformat:2 }}</td>
-                <td class="right">£{{ monthly_sub|floatformat:2 }}</td>
-            </tr>
-            {% if users > 0 %}
-            <tr>
-                <td>
-                    <strong>User Licenses</strong><br>
-                    <span style="font-size: 9pt; color: #555555;">Additional active team members</span>
-                </td>
-                <td class="right">{{ users }}</td>
-                <td class="right">£{{ per_user|floatformat:2 }}</td>
-                <td class="right">£{{ user_licenses_total|floatformat:2 }}</td>
-            </tr>
-            {% endif %}
-        </tbody>
-    </table>
-
-    <table width="100%">
-        <tr>
-            <td width="50%"></td>
-            <td width="50%">
-                <table class="summary-table">
-                    <tr>
-                        <td>Subtotal:</td>
-                        <td>£{{ subtotal|floatformat:2 }}</td>
-                    </tr>
-                    <tr>
-                        <td>VAT (20%):</td>
-                        <td>£{{ vat_amount|floatformat:2 }}</td>
-                    </tr>
-                    <tr class="total-row">
-                        <td>Total Due:</td>
-                        <td>£{{ total_amount|floatformat:2 }}</td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-
-    <div class="footer">
-        <p>Please pay within 14 days of receiving this invoice. Thank you for your business!</p>
-        <p style="margin-top: 15px;">
-            <strong>Note:</strong> TRESTA belongs to Estrada building services. so the bank account details are from Estrada building services.
-        </p>
+    
+    <div class="header-sub-strip">
+        Tresta | Part of Estrada Building Services Ltd
     </div>
 
+    <div class="content">
+        <!-- From and Meta info -->
+        <table width="100%">
+            <tr>
+                <td width="55%" valign="top">
+                    <div class="section-title">FROM</div>
+                    <div style="font-size: 11pt; font-weight: bold; margin-bottom: 3px;">Tresta</div>
+                    <div>84 Alers Road</div>
+                    <br>
+                    <div>Bexleyheath, DA6 8HT</div>
+                    <div>info@tresta.cloud</div>
+                </td>
+                <td width="45%" valign="top">
+                    <table class="meta-table" cellspacing="0" cellpadding="0">
+                        <tr>
+                            <td width="40%" class="meta-label">Invoice no.</td>
+                            <td width="60%" class="meta-value-yellow">{{ invoice.invoice_number }}</td>
+                        </tr>
+                        <tr>
+                            <td class="meta-label">Invoice date</td>
+                            <td class="meta-value-yellow">{{ date }}</td>
+                        </tr>
+                        <tr>
+                            <td class="meta-label">Due date</td>
+                            <td class="meta-value-yellow">{{ due_date }}</td>
+                        </tr>
+                        <tr>
+                            <td class="meta-label">Payment terms</td>
+                            <td class="meta-value">10 days</td>
+                        </tr>
+                        <tr>
+                            <td class="meta-label">VAT no.</td>
+                            <td class="meta-value">237 5409 01</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <br><br>
+
+        <!-- Bill To -->
+        <div class="section-title">BILL TO</div>
+        <div class="bill-to-yellow">
+            {{ company.company_name }}
+        </div>
+        {% if company.admin_name %}
+        <div style="padding: 5px 10px;">
+            {{ company.admin_name }} {{ company.admin_surname }}<br>
+            {{ company.admin_email }}
+        </div>
+        {% endif %}
+
+        <!-- Items Table -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th width="50%">DESCRIPTION</th>
+                    <th width="15%" class="right">QTY</th>
+                    <th width="15%" class="right">UNIT PRICE</th>
+                    <th width="20%" class="right">AMOUNT</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Subscription per month</td>
+                    <td class="right">1</td>
+                    <td class="right">£{{ monthly_sub|floatformat:2 }}</td>
+                    <td class="right">£{{ monthly_sub|floatformat:2 }}</td>
+                </tr>
+                {% if users > 0 %}
+                <tr>
+                    <td>Users</td>
+                    <td class="right">{{ users }}</td>
+                    <td class="right">£{{ per_user|floatformat:2 }}</td>
+                    <td class="right">£{{ user_licenses_total|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <!-- Bottom section (Payment details and Summary) -->
+        <table class="bottom-table">
+            <tr>
+                <td width="55%" valign="top">
+                    <div class="section-title">PAYMENT DETAILS</div>
+                    <table cellspacing="0" cellpadding="0" width="100%">
+                        <tr>
+                            <td width="35%" class="payment-label">Account name</td>
+                            <td width="65%">Estrada building services</td>
+                        </tr>
+                        <tr>
+                            <td class="payment-label">Bank</td>
+                            <td>Santander</td>
+                        </tr>
+                        <tr>
+                            <td class="payment-label">Sort code</td>
+                            <td>09-01-28</td>
+                        </tr>
+                        <tr>
+                            <td class="payment-label">Account no.</td>
+                            <td>82051171</td>
+                        </tr>
+                        <tr>
+                            <td class="payment-label">Reference</td>
+                            <td>{{ invoice.invoice_number }}</td>
+                        </tr>
+                        <tr>
+                            <td class="payment-label">Email</td>
+                            <td>info@tresta.cloud</td>
+                        </tr>
+                    </table>
+                </td>
+                <td width="45%" valign="bottom">
+                    <table class="summary-table">
+                        <tr>
+                            <td>Subtotal</td>
+                            <td>£{{ subtotal|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td>VAT (20%)</td>
+                            <td>£{{ vat_amount|floatformat:2 }}</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td>TOTAL DUE</td>
+                            <td>£{{ total_amount|floatformat:2 }}</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <div class="footer">
+            <div class="footer-line-1">Tresta is part of the Estrada Building Services group.</div>
+            <div class="footer-line-2">Estrada Building Services Ltd | Company no. 09587216 | VAT registration no. 237 5409 01</div>
+        </div>
+
+    </div>
 </body>
 </html>

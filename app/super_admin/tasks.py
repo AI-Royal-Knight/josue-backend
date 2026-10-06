@@ -45,10 +45,12 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
             monthly_sub = company.monthly_subscription or Decimal("0.00")
             per_user = company.per_user_rate or Decimal("0.00")
             
-            from app.account.models import UserAccount
+            from app.account.models import UserAccount, Invitation
             users = UserAccount.objects.filter(company=company).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
+            invites = Invitation.objects.filter(company=company, status=Invitation.Status.PENDING).count()
+            total_users_count = users + invites
 
-            subtotal = monthly_sub + (per_user * users)
+            subtotal = monthly_sub + (per_user * total_users_count)
             vat_rate_decimal = Decimal("0.20")
             vat_amount = subtotal * vat_rate_decimal
             total_amount = subtotal + vat_amount
@@ -66,7 +68,11 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
                 }
             )
 
-            if created:
+            if force or created:
+                if not created:
+                    invoice.amount = total_amount
+                    invoice.save(update_fields=["amount"])
+                    
                 # Generate PDF
                 html_string = render_to_string("super_admin/invoice_pdf.html", {
                     "company": company,
@@ -76,9 +82,10 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
                     "total_amount": total_amount,
                     "monthly_sub": monthly_sub,
                     "per_user": per_user,
-                    "users": users,
-                    "user_licenses_total": per_user * users,
+                    "users": total_users_count,
+                    "user_licenses_total": per_user * total_users_count,
                     "date": now.strftime("%B %d, %Y"),
+                    "due_date": (now + timezone.timedelta(days=10)).strftime("%B %d, %Y"),
                 })
                 
                 pdf_file = io.BytesIO()
