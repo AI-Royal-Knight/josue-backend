@@ -28,7 +28,7 @@ html_string = render_to_string("super_admin/invoice_pdf.html", {
     "date": now.strftime("%B %d, %Y"),
     "due_date": now.strftime("%B %d, %Y"),
 })
-pdf_file = io.BytesIO()
+pdf_file = open('test.pdf', 'wb')
 pisa_status = pisa.CreatePDF(io.StringIO(html_string), dest=pdf_file)
 if pisa_status.err:
     print("Error generating PDF")
