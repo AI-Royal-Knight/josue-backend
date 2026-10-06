@@ -50,7 +50,7 @@
         }
 
         .content {
-            padding: 30px;
+            padding: 15px 30px;
         }
 
         .section-title {
@@ -95,8 +95,8 @@
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 30px;
-            margin-bottom: 40px;
+            margin-top: 15px;
+            margin-bottom: 20px;
         }
 
         .items-table th {
@@ -149,8 +149,8 @@
         }
 
         .footer {
-            margin-top: 50px;
-            padding-top: 15px;
+            margin-top: 30px;
+            padding-top: 10px;
             text-align: center;
         }
 
@@ -191,11 +191,11 @@
             <tr>
                 <td width="55%" valign="top">
                     <div class="section-title">FROM</div>
-                    <div style="font-size: 11pt; font-weight: bold; margin-bottom: 3px;">Tresta</div>
-                    <div>84 Alers Road</div>
+                    <span style="font-size: 11pt; font-weight: bold;">Tresta</span><br>
+                    84 Alers Road<br>
                     <br>
-                    <div>Bexleyheath, DA6 8HT</div>
-                    <div>info@tresta.cloud</div>
+                    Bexleyheath, DA6 8HT<br>
+                    info@tresta.cloud
                 </td>
                 <td width="45%" valign="top">
                     <table class="meta-table" cellspacing="0" cellpadding="0">
@@ -224,7 +224,7 @@
             </tr>
         </table>
 
-        <br><br>
+        <div style="height: 10px;"></div>
 
         <!-- Bill To -->
         <div class="section-title">BILL TO</div>
@@ -236,6 +236,8 @@
             {{ company.admin_name }} {{ company.admin_surname }}<br>
             {{ company.admin_email }}
         </div>
+        {% else %}
+        <div style="height: 10px;"></div>
         {% endif %}
 
         <!-- Items Table -->
