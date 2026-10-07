@@ -487,7 +487,8 @@ class MonthlyInvoiceView(APIView):
             company_id=company_id,
             force=True,
             target_year=invoice_year,
-            target_month=invoice_month
+            target_month=invoice_month,
+            sender_admin_id=request.user.id if request.user else None
         )
 
         try:
@@ -524,7 +525,7 @@ class MonthlyInvoiceDetailView(APIView):
             else:
                 invoice.payment_date = None
                 
-        invoice.save()
+            invoice.save()
 
         from .serializers import MonthlyInvoiceListSerializer
         serializer = MonthlyInvoiceListSerializer(invoice)
@@ -545,7 +546,8 @@ class ResendMonthlyInvoiceView(APIView):
             company_id=invoice.company_id,
             force=True,
             target_year=invoice.year,
-            target_month=invoice.month
+            target_month=invoice.month,
+            sender_admin_id=request.user.id if request.user else None
         )
         return Response({"message": "Invoice resent successfully."}, status=status.HTTP_200_OK)
 
@@ -586,12 +588,13 @@ class MonthlyInvoicePdfView(APIView):
             invoice.save(update_fields=["amount"])
 
         admin_user = company.users.filter(role="admin").first()
+        billing_user = request.user if getattr(request.user, 'is_super_admin', False) else None
 
         html_string = render_to_string("super_admin/invoice_pdf.html", {
             "company": company,
             "admin_user": admin_user,
             "invoice": invoice,
-            "billing": InvoiceService.get_super_admin_billing_details(),
+            "billing": InvoiceService.get_super_admin_billing_details(user=billing_user),
             "total_amount": total_amount,
             "monthly_sub": monthly_sub,
             "per_user": per_user,

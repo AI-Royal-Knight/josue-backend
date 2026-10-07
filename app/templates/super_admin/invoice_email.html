@@ -12,11 +12,40 @@
                 We have attached your monthly invoice for <strong>{{ month_name }} {{ year }}</strong> to this email.
             </p>
             
-            <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 20px; margin: 25px 0; border-radius: 0 6px 6px 0;">
+            <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 15px 20px; margin: 20px 0; border-radius: 0 6px 6px 0;">
                 <p style="margin: 0; font-size: 15px; color: #475569; line-height: 24px;">
-                    Please find the PDF document attached for a detailed breakdown of your subscription and user licenses for the billing period.
+                    Invoice <strong>{{ invoice_number }}</strong> has been generated for your account. Please find the detailed breakdown below and attached as a PDF:
                 </p>
             </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+                <thead>
+                    <tr style="background-color: #111827; color: #ffffff;">
+                        <th style="padding: 10px 12px; text-align: left; font-size: 12px; letter-spacing: 0.5px;">DESCRIPTION</th>
+                        <th style="padding: 10px 12px; text-align: right; font-size: 12px;">QTY</th>
+                        <th style="padding: 10px 12px; text-align: right; font-size: 12px;">UNIT PRICE</th>
+                        <th style="padding: 10px 12px; text-align: right; font-size: 12px;">AMOUNT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 10px 12px; color: #111827;">Subscription per month</td>
+                        <td style="padding: 10px 12px; text-align: right; color: #4b5563;">1</td>
+                        <td style="padding: 10px 12px; text-align: right; color: #4b5563;">&pound;{{ monthly_sub|floatformat:2 }}</td>
+                        <td style="padding: 10px 12px; text-align: right; font-weight: 500; color: #111827;">&pound;{{ monthly_sub|floatformat:2 }}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 10px 12px; color: #111827;">Users (registered seats)</td>
+                        <td style="padding: 10px 12px; text-align: right; color: #4b5563;">{{ users }}</td>
+                        <td style="padding: 10px 12px; text-align: right; color: #4b5563;">&pound;{{ per_user|floatformat:2 }}</td>
+                        <td style="padding: 10px 12px; text-align: right; font-weight: 500; color: #111827;">&pound;{{ user_licenses_total|floatformat:2 }}</td>
+                    </tr>
+                    <tr style="background-color: #f0fdf4; font-weight: bold; font-size: 15px;">
+                        <td colspan="3" style="padding: 12px; text-align: right; color: #065f46;">TOTAL DUE:</td>
+                        <td style="padding: 12px; text-align: right; color: #065f46;">&pound;{{ total_amount|floatformat:2 }}</td>
+                    </tr>
+                </tbody>
+            </table>
             
             <p style="font-size: 15px; line-height: 24px; color: #52525b; margin-top: 30px;">
                 If you have any questions or concerns regarding this invoice, please don't hesitate to contact our support team. We're always here to help.

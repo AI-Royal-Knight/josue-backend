@@ -15,7 +15,7 @@ def get_last_day_of_month(year, month):
     return calendar.monthrange(year, month)[1]
 
 @shared_task
-def generate_and_send_monthly_invoices(company_id=None, force=False, target_year=None, target_month=None):
+def generate_and_send_monthly_invoices(company_id=None, force=False, target_year=None, target_month=None, sender_admin_id=None):
     now = timezone.now()
     year = target_year if target_year else now.year
     month = target_month if target_month else now.month
@@ -27,6 +27,11 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
         companies = Company.objects.filter(id=company_id)
     else:
         companies = Company.objects.filter(activate=True, auto_monthly_inv=True)
+
+    from app.account.models import UserAccount
+    sender_admin = None
+    if sender_admin_id:
+        sender_admin = UserAccount.objects.filter(id=sender_admin_id, role=UserAccount.Role.SUPER_ADMIN).first()
 
     for company in companies:
         target_date = company.auto_monthly_inv_date or 1
@@ -69,12 +74,14 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
                     invoice.save(update_fields=["amount"])
                     
                 admin_user = company.users.filter(role="admin").first()
+                billing_details = InvoiceService.get_super_admin_billing_details(user=sender_admin)
+
                 # Generate PDF
                 html_string = render_to_string("super_admin/invoice_pdf.html", {
                     "company": company,
                     "admin_user": admin_user,
                     "invoice": invoice,
-                    "billing": InvoiceService.get_super_admin_billing_details(),
+                    "billing": billing_details,
                     "total_amount": total_amount,
                     "monthly_sub": monthly_sub,
                     "per_user": per_user,
@@ -118,14 +125,21 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
                         recipient = any_user.email if any_user else None
 
                     if recipient:
+                        month_name = calendar.month_name[month]
                         email_html = render_to_string("super_admin/invoice_email.html", {
                             "company": company,
-                            "month_name": now.strftime("%B"),
-                            "year": year
+                            "month_name": month_name,
+                            "year": year,
+                            "invoice_number": invoice_number,
+                            "monthly_sub": monthly_sub,
+                            "per_user": per_user,
+                            "users": total_users_count,
+                            "user_licenses_total": user_licenses_total,
+                            "total_amount": total_amount,
                         })
                         
                         email = EmailMessage(
-                            subject=f"Your Monthly Invoice - {now.strftime('%B %Y')}",
+                            subject=f"Your Monthly Invoice - {month_name} {year}",
                             body=email_html,
                             from_email=None,
                             to=[recipient],

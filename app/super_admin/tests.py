@@ -210,4 +210,49 @@ class SuperAdminBillingAndProfileTest(TestCase):
         self.super_admin.refresh_from_db()
         self.assertTrue(self.super_admin.check_password("NewSecurePassword456!"))
 
+    def test_multi_super_admin_latest_profile_reflection(self):
+        # Create a second super admin
+        second_admin = UserAccount.objects.create_user(
+            email="secondadmin@tresta.cloud",
+            password="SecondPassword123!",
+            first_name="Second",
+            last_name="SuperAdmin",
+            role=UserAccount.Role.SUPER_ADMIN,
+        )
+        from app.account.models import UserProfile
+        profile2, _ = UserProfile.objects.get_or_create(user=second_admin)
+        profile2.account_name = "Second Admin Bank Account"
+        profile2.vat_number = "GB-SECOND-VAT"
+        profile2.address = "100 Oxford Street, London"
+        profile2.bank_name = "Lloyds"
+        profile2.save()
+
+        # InvoiceService should prioritize the most recently updated super admin profile
+        billing = InvoiceService.get_super_admin_billing_details()
+        self.assertEqual(billing["account_name"], "Second Admin Bank Account")
+        self.assertEqual(billing["vat_number"], "GB-SECOND-VAT")
+        self.assertEqual(billing["address"], "100 Oxford Street, London")
+        self.assertEqual(billing["bank_name"], "Lloyds")
+
+    def test_invoice_email_template_contains_line_items_breakdown(self):
+        from django.template.loader import render_to_string
+        html = render_to_string("super_admin/invoice_email.html", {
+            "company": self.company,
+            "month_name": "October",
+            "year": 2026,
+            "invoice_number": "INV-202610-TEST",
+            "monthly_sub": Decimal("100.00"),
+            "per_user": Decimal("5.00"),
+            "users": 5,
+            "user_licenses_total": Decimal("25.00"),
+            "total_amount": Decimal("125.00"),
+        })
+        self.assertIn("Subscription per month", html)
+        self.assertIn("100.00", html)
+        self.assertIn("Users (registered seats)", html)
+        self.assertIn("25.00", html)
+        self.assertIn("125.00", html)
+        self.assertIn("INV-202610-TEST", html)
+
+
 

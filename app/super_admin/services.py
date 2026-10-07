@@ -35,18 +35,36 @@ class InvoiceService:
         """
         Count all users registered for the company plus pending invitations.
         Excludes super admins.
-        Falls back to company.user if no direct accounts/invites exist yet.
+        Calculates the maximum of:
+        - Actually registered/assigned users (UserAccount direct, RoleAssignment, name match)
+        - Pending invitations (both Invitation and CompanyInvitation)
+        - company.user allocated seats
+        Keeps company.user updated in the database so all views stay in sync.
         """
-        from app.account.models import UserAccount, Invitation
-        users_count = UserAccount.objects.filter(company=company).exclude(
-            role=UserAccount.Role.SUPER_ADMIN
-        ).count()
-        if company.company_name:
-            name_users = UserAccount.objects.filter(
-                company__company_name__iexact=company.company_name.strip()
-            ).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
-            users_count = max(users_count, name_users)
+        from app.account.models import UserAccount, Invitation, RoleAssignment
+        from app.super_admin.models import CompanyInvitation
 
+        user_ids = set(
+            UserAccount.objects.filter(company=company)
+            .exclude(role=UserAccount.Role.SUPER_ADMIN)
+            .values_list('id', flat=True)
+        )
+        if company.company_name:
+            user_ids.update(
+                UserAccount.objects.filter(
+                    company__company_name__iexact=company.company_name.strip()
+                )
+                .exclude(role=UserAccount.Role.SUPER_ADMIN)
+                .values_list('id', flat=True)
+            )
+
+        # Include users associated via RoleAssignment
+        role_user_ids = RoleAssignment.objects.filter(company=company).exclude(
+            user__role=UserAccount.Role.SUPER_ADMIN
+        ).values_list('user_id', flat=True)
+        user_ids.update(role_user_ids)
+
+        # Include pending invitations
         invites_count = Invitation.objects.filter(
             company=company, status=Invitation.Status.PENDING
         ).count()
@@ -57,9 +75,18 @@ class InvoiceService:
             ).count()
             invites_count = max(invites_count, name_invites)
 
-        total = users_count + invites_count
-        if total == 0 and company.user:
-            total = company.user
+        company_invites = CompanyInvitation.objects.filter(
+            company=company, accepted=False
+        ).count()
+
+        actual_active = len(user_ids) + invites_count + company_invites
+        allocated_seats = company.user or 0
+
+        total = max(actual_active, allocated_seats)
+        if company.user != total:
+            company.user = total
+            company.save(update_fields=['user'])
+
         return total
 
     @staticmethod
@@ -88,13 +115,14 @@ class InvoiceService:
         }
 
     @staticmethod
-    def get_super_admin_billing_details():
+    def get_super_admin_billing_details(user=None):
         """
         Retrieves the billing / bank details from the super admin's profile.
         Falls back to default Tresta / Estrada values if fields are unset.
+        If a user object is provided and is a super admin, prioritizes their profile.
+        Otherwise, selects the super admin with the most recently updated profile.
         """
         from app.account.models import UserAccount, UserProfile
-        super_admin = UserAccount.objects.filter(role=UserAccount.Role.SUPER_ADMIN).first()
         defaults = {
             "company_name": "Tresta",
             "account_name": "Estrada building services",
@@ -107,6 +135,18 @@ class InvoiceService:
             "iban": "",
             "swift_bic": "",
         }
+
+        super_admin = None
+        if user and (getattr(user, 'is_super_admin', False) or getattr(user, 'role', None) == UserAccount.Role.SUPER_ADMIN):
+            super_admin = user
+
+        if not super_admin:
+            # Pick the super admin whose profile was most recently updated
+            super_admin = (
+                UserAccount.objects.filter(role=UserAccount.Role.SUPER_ADMIN)
+                .order_by('-profile__updated_at', '-date_joined')
+                .first()
+            )
 
         if not super_admin:
             return defaults
