@@ -31,9 +31,13 @@ from .serializers import (
 )
 from .tokens import get_tokens_for_user
 import random
+import threading
+import logging
 from django.core.cache import cache
 from .models import Invitation, RoleAssignment, UserProfile, SupplierProfile, CompanySupplier, Company, UserAccount
 from app.project_admin.models import Project
+
+logger = logging.getLogger(__name__)
 
 # Helpers
 
@@ -251,10 +255,13 @@ def _build_login_response(user):
 
 def _send_2fa_otp(user):
     otp = f"{random.randint(100000, 999999)}"
+    
+    # Store directly in database on UserAccount (shared across all Gunicorn workers and processes)
+    user.set_two_factor_otp(otp)
+    
+    # Also keep in-memory cache as secondary fallback
     cache.set(f"2fa_otp_{user.email}", otp, timeout=300)
 
-    import logging
-    logger = logging.getLogger(__name__)
     logger.info(f"Two-Step Verification OTP generated for {user.email}: {otp}")
 
     subject = "Your Two-Step Verification Code"
@@ -294,17 +301,23 @@ def _send_2fa_otp(user):
     </html>
     """
 
-    try:
-        send_mail(
-            subject,
-            message,
-            get_default_from_email(),
-            [user.email],
-            fail_silently=True,
-            html_message=html_message,
-        )
-    except Exception as e:
-        logger.error(f"Failed to send 2FA email to {user.email}: {e}")
+    recipient_email = user.email
+
+    def _async_send():
+        try:
+            send_mail(
+                subject,
+                message,
+                get_default_from_email(),
+                [recipient_email],
+                fail_silently=True,
+                html_message=html_message,
+            )
+            logger.info(f"Two-Step Verification email sent successfully to {recipient_email}")
+        except Exception as e:
+            logger.error(f"Failed to send 2FA email to {recipient_email}: {e}")
+
+    threading.Thread(target=_async_send, daemon=True).start()
 
     return otp
 
@@ -322,11 +335,11 @@ class LoginView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        email = serializer.validated_data["email"]
+        email = serializer.validated_data["email"].strip()
         password = serializer.validated_data["password"]
         otp = serializer.validated_data.get("otp", "").strip()
 
-        user = UserAccount.objects.filter(email=email).first()
+        user = UserAccount.objects.filter(email__iexact=email).first()
         
         if not user or not user.check_password(password):
             return Response(
@@ -363,7 +376,8 @@ class LoginView(APIView):
         if is_2fa_enabled:
             if otp:
                 cached_otp = cache.get(f"2fa_otp_{user.email}")
-                if not cached_otp or str(cached_otp).strip() != str(otp).strip():
+                is_valid = user.verify_two_factor_otp(otp) or (cached_otp and str(cached_otp).strip() == str(otp).strip())
+                if not is_valid:
                     return Response(
                         {"error": "Invalid or expired verification code."},
                         status=status.HTTP_400_BAD_REQUEST,
@@ -391,21 +405,23 @@ class Verify2FAView(APIView):
         if not serializer.is_valid():
             return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
 
-        email = serializer.validated_data["email"]
+        email = serializer.validated_data["email"].strip()
         otp = serializer.validated_data["otp"].strip()
 
-        user = UserAccount.objects.filter(email=email).first()
+        user = UserAccount.objects.filter(email__iexact=email).first()
         if not user:
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if not user.is_active:
             return Response({"error": "Account is not active."}, status=status.HTTP_403_FORBIDDEN)
 
-        cached_otp = cache.get(f"2fa_otp_{email}")
-        if not cached_otp or str(cached_otp).strip() != str(otp).strip():
+        cached_otp = cache.get(f"2fa_otp_{user.email}")
+        is_valid = user.verify_two_factor_otp(otp) or (cached_otp and str(cached_otp).strip() == str(otp).strip())
+
+        if not is_valid:
             return Response({"error": "Invalid or expired verification code."}, status=status.HTTP_400_BAD_REQUEST)
 
-        cache.delete(f"2fa_otp_{email}")
+        cache.delete(f"2fa_otp_{user.email}")
         return Response(_build_login_response(user), status=status.HTTP_200_OK)
 
 
@@ -419,8 +435,8 @@ class Resend2FAView(APIView):
         if not serializer.is_valid():
             return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
 
-        email = serializer.validated_data["email"]
-        user = UserAccount.objects.filter(email=email).first()
+        email = serializer.validated_data["email"].strip()
+        user = UserAccount.objects.filter(email__iexact=email).first()
         if not user or not user.is_active:
             return Response({"error": "Unable to send verification code."}, status=status.HTTP_400_BAD_REQUEST)
 

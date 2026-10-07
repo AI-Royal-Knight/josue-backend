@@ -154,6 +154,57 @@ class UserAccount(
         default=False
     )
 
+    two_factor_otp = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        help_text="Active two-factor authentication OTP code"
+    )
+
+    two_factor_otp_created_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Timestamp when active two-factor OTP was generated"
+    )
+
+    two_factor_otp_backup = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        help_text="Previous two-factor OTP to gracefully handle out-of-order delivery"
+    )
+
+    def set_two_factor_otp(self, otp: str):
+        """Sets a new 2FA OTP, preserving the previous one as backup to prevent out-of-order race conditions."""
+        if self.two_factor_otp:
+            self.two_factor_otp_backup = self.two_factor_otp
+        self.two_factor_otp = str(otp).strip()
+        self.two_factor_otp_created_at = timezone.now()
+        self.save(update_fields=['two_factor_otp', 'two_factor_otp_backup', 'two_factor_otp_created_at'])
+
+    def verify_two_factor_otp(self, otp: str) -> bool:
+        """Verifies if the provided OTP matches the active or recent backup OTP within 5 minutes."""
+        if not otp or not self.two_factor_otp_created_at:
+            return False
+            
+        now = timezone.now()
+        # 5 minutes validity (300 seconds)
+        if (now - self.two_factor_otp_created_at).total_seconds() > 300:
+            return False
+            
+        cleaned_otp = str(otp).strip()
+        matches_active = bool(self.two_factor_otp and self.two_factor_otp.strip() == cleaned_otp)
+        matches_backup = bool(self.two_factor_otp_backup and self.two_factor_otp_backup.strip() == cleaned_otp)
+        
+        if matches_active or matches_backup:
+            self.two_factor_otp = None
+            self.two_factor_otp_backup = None
+            self.two_factor_otp_created_at = None
+            self.save(update_fields=['two_factor_otp', 'two_factor_otp_backup', 'two_factor_otp_created_at'])
+            return True
+            
+        return False
+
     date_joined = models.DateTimeField(
         default=timezone.now
     )

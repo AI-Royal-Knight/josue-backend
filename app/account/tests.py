@@ -197,7 +197,8 @@ class SnagListFixesTestCase(TestCase):
         res_verify_bad = Verify2FAView.as_view()(req_verify_bad)
         self.assertEqual(res_verify_bad.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # 3. Verify with correct OTP
+        # 3. Verify with correct OTP even if cache was completely cleared (simulating different Gunicorn worker)
+        cache.clear()
         req_verify_good = self.factory.post(
             '/api/v1/account/login/verify-2fa/',
             {
@@ -212,7 +213,60 @@ class SnagListFixesTestCase(TestCase):
         self.assertIn('access_token', res_verify_good.data)
         self.assertEqual(res_verify_good.data['user']['email'], 'twofa_user@tresta.cloud')
 
-        # Check OTP was consumed from cache
-        self.assertIsNone(cache.get("2fa_otp_twofa_user@tresta.cloud"))
+        # Check OTP was consumed from DB
+        user_2fa.refresh_from_db()
+        self.assertIsNone(user_2fa.two_factor_otp)
+
+    def test_two_factor_backup_otp_handling(self):
+        """If a user re-triggers OTP or resends, the previous OTP is still valid within 5 minutes."""
+        from django.core.cache import cache
+        from app.account.views import Verify2FAView, Resend2FAView
+
+        user_2fa = UserAccount.objects.create_user(
+            email="backup_otp_user@tresta.cloud",
+            password="StrongPassword123!",
+            first_name="Secure",
+            last_name="User",
+            role=UserAccount.Role.SUPER_ADMIN,
+            two_factor_enabled=True,
+        )
+
+        # 1. Login attempt 1 -> generates OTP 1
+        req1 = self.factory.post(
+            '/api/v1/account/login/',
+            {'email': 'backup_otp_user@tresta.cloud', 'password': 'StrongPassword123!'},
+            format='json'
+        )
+        res1 = LoginView.as_view()(req1)
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        user_2fa.refresh_from_db()
+        otp1 = user_2fa.two_factor_otp
+
+        # 2. Resend code -> generates OTP 2
+        req2 = self.factory.post(
+            '/api/v1/account/login/resend-2fa/',
+            {'email': 'backup_otp_user@tresta.cloud'},
+            format='json'
+        )
+        res2 = Resend2FAView.as_view()(req2)
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        user_2fa.refresh_from_db()
+        otp2 = user_2fa.two_factor_otp
+        self.assertNotEqual(otp1, otp2)
+        self.assertEqual(user_2fa.two_factor_otp_backup, otp1)
+
+        # 3. Clear cache to simulate another worker
+        cache.clear()
+
+        # User enters OTP 1 (from the first email) -> MUST STILL WORK WITHOUT WAITING!
+        req_verify_old = self.factory.post(
+            '/api/v1/account/login/verify-2fa/',
+            {'email': 'backup_otp_user@tresta.cloud', 'otp': otp1},
+            format='json'
+        )
+        res_verify_old = Verify2FAView.as_view()(req_verify_old)
+        self.assertEqual(res_verify_old.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_verify_old.data.get('success'))
+
 
 
