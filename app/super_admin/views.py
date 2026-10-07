@@ -557,7 +557,7 @@ from django.utils import timezone
 from decimal import Decimal
 
 class MonthlyInvoicePdfView(APIView):
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk):
         try:
@@ -565,31 +565,37 @@ class MonthlyInvoicePdfView(APIView):
         except MonthlyInvoice.DoesNotExist:
             return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        company = invoice.company
-        now = timezone.now()
-        
-        monthly_sub = company.monthly_subscription or Decimal("0.00")
-        per_user = company.per_user_rate or Decimal("0.00")
-        from app.account.models import UserAccount, Invitation
-        users = UserAccount.objects.filter(company=company).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
-        invites = Invitation.objects.filter(company=company, status=Invitation.Status.PENDING).count()
-        total_users_count = users + invites
+        # Allow Super Admin or company Admin
+        if request.user.role != UserAccount.Role.SUPER_ADMIN:
+            if request.user.role != UserAccount.Role.ADMIN or request.user.company != invoice.company:
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-        subtotal = monthly_sub + (per_user * total_users_count)
-        vat_rate_decimal = Decimal("0.20")
-        vat_amount = subtotal * vat_rate_decimal
-        total_amount = subtotal + vat_amount
+        company = invoice.company
+        now = invoice.created_at or timezone.now()
+        
+        from app.super_admin.services import InvoiceService
+        breakdown = InvoiceService.calculate_monthly_invoice_breakdown(company)
+        monthly_sub = breakdown["monthly_sub"]
+        per_user = breakdown["per_user"]
+        total_users_count = breakdown["users_count"]
+        user_licenses_total = breakdown["user_licenses_total"]
+        total_amount = breakdown["total_amount"]
+
+        if invoice.amount != total_amount:
+            invoice.amount = total_amount
+            invoice.save(update_fields=["amount"])
+
+        admin_user = company.users.filter(role="admin").first()
 
         html_string = render_to_string("super_admin/invoice_pdf.html", {
             "company": company,
+            "admin_user": admin_user,
             "invoice": invoice,
-            "subtotal": subtotal,
-            "vat_amount": vat_amount,
             "total_amount": total_amount,
             "monthly_sub": monthly_sub,
             "per_user": per_user,
             "users": total_users_count,
-            "user_licenses_total": per_user * total_users_count,
+            "user_licenses_total": user_licenses_total,
             "date": now.strftime("%B %d, %Y"),
             "due_date": (now + timezone.timedelta(days=10)).strftime("%B %d, %Y"),
         })
@@ -603,4 +609,5 @@ class MonthlyInvoicePdfView(APIView):
         response = HttpResponse(pdf_file.getvalue(), content_type='application/pdf')
         response['Content-Disposition'] = f'inline; filename="invoice_{invoice.invoice_number}.pdf"'
         return response
+
 

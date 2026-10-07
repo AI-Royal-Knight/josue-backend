@@ -65,15 +65,9 @@ class CompanyListSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.IntegerField())
     def get_user(self, obj):
-        from app.account.models import UserAccount, Invitation
-        if obj.company_name:
-            users_count = UserAccount.objects.filter(company__company_name__iexact=obj.company_name.strip()).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
-            invites_count = Invitation.objects.filter(company__company_name__iexact=obj.company_name.strip(), status=Invitation.Status.PENDING).count()
-            return users_count + invites_count
-        
-        users_count = UserAccount.objects.filter(company=obj).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
-        invites_count = Invitation.objects.filter(company=obj, status=Invitation.Status.PENDING).count()
-        return users_count + invites_count
+        from .services import InvoiceService
+        return InvoiceService.get_company_registered_users_count(obj)
+
 
     @extend_schema_field(serializers.IntegerField())
     def get_invoices_count(self, obj):

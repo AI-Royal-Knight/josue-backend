@@ -42,18 +42,13 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
                 continue
 
             # Generate invoice
-            monthly_sub = company.monthly_subscription or Decimal("0.00")
-            per_user = company.per_user_rate or Decimal("0.00")
-            
-            from app.account.models import UserAccount, Invitation
-            users = UserAccount.objects.filter(company=company).exclude(role=UserAccount.Role.SUPER_ADMIN).count()
-            invites = Invitation.objects.filter(company=company, status=Invitation.Status.PENDING).count()
-            total_users_count = users + invites
-
-            subtotal = monthly_sub + (per_user * total_users_count)
-            vat_rate_decimal = Decimal("0.20")
-            vat_amount = subtotal * vat_rate_decimal
-            total_amount = subtotal + vat_amount
+            from app.super_admin.services import InvoiceService
+            breakdown = InvoiceService.calculate_monthly_invoice_breakdown(company)
+            monthly_sub = breakdown["monthly_sub"]
+            per_user = breakdown["per_user"]
+            total_users_count = breakdown["users_count"]
+            user_licenses_total = breakdown["user_licenses_total"]
+            total_amount = breakdown["total_amount"]
             invoice_number = f"INV-{year}{month:02d}-{str(company.id)[:4].upper()}"
 
             invoice, created = MonthlyInvoice.objects.get_or_create(
@@ -73,17 +68,17 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
                     invoice.amount = total_amount
                     invoice.save(update_fields=["amount"])
                     
+                admin_user = company.users.filter(role="admin").first()
                 # Generate PDF
                 html_string = render_to_string("super_admin/invoice_pdf.html", {
                     "company": company,
+                    "admin_user": admin_user,
                     "invoice": invoice,
-                    "subtotal": subtotal,
-                    "vat_amount": vat_amount,
                     "total_amount": total_amount,
                     "monthly_sub": monthly_sub,
                     "per_user": per_user,
                     "users": total_users_count,
-                    "user_licenses_total": per_user * total_users_count,
+                    "user_licenses_total": user_licenses_total,
                     "date": now.strftime("%B %d, %Y"),
                     "due_date": (now + timezone.timedelta(days=10)).strftime("%B %d, %Y"),
                 })

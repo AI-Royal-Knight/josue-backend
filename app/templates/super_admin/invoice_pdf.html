@@ -117,8 +117,40 @@
             font-size: 10pt;
         }
 
-        .bottom-table {
+        .summary-container {
             width: 100%;
+            border-collapse: collapse;
+            margin-top: 0px;
+            margin-bottom: 25px;
+        }
+
+        .summary-label {
+            padding: 6px 12px;
+            text-align: left;
+            font-size: 9.5pt;
+            font-weight: bold;
+            color: #5c6c7b;
+        }
+
+        .summary-value {
+            padding: 6px 12px;
+            text-align: right;
+            font-size: 9.5pt;
+            font-weight: bold;
+        }
+
+        .total-box {
+            background-color: #1bc39a;
+            color: #111827;
+            font-weight: bold;
+            padding: 9px 12px;
+            font-size: 11pt;
+        }
+
+        .payment-table {
+            width: 60%;
+            border-collapse: collapse;
+            margin-top: 4px;
         }
 
         .payment-label {
@@ -126,31 +158,13 @@
             font-weight: bold;
             font-size: 9.5pt;
             padding: 3px 10px 3px 0;
+            width: 35%;
         }
 
-        .summary-label {
-            padding: 5px 10px;
-            text-align: right;
-            font-size: 10pt;
-            font-weight: bold;
-        }
-
-        .summary-value {
-            padding: 5px 10px;
-            text-align: right;
-            font-size: 10pt;
-            font-weight: bold;
-        }
-        
-        .right-align {
-            text-align: right;
-        }
-
-        .total-row td {
-            background-color: #1bc39a;
-            color: #111827;
-            font-weight: bold;
-            padding: 8px 10px;
+        .payment-value {
+            font-size: 9.5pt;
+            padding: 3px 0;
+            width: 65%;
         }
 
         .footer {
@@ -240,8 +254,13 @@
                 </td>
             </tr>
         </table>
-        {% if company.admin_name %}
-        <div style="padding: 5px 10px;">
+        {% if admin_user %}
+        <div style="padding: 4px 10px; font-size: 9.5pt;">
+            {{ admin_user.first_name }} {{ admin_user.last_name }}<br>
+            {{ admin_user.email }}
+        </div>
+        {% elif company.admin_name %}
+        <div style="padding: 4px 10px; font-size: 9.5pt;">
             {{ company.admin_name }} {{ company.admin_surname }}<br>
             {{ company.admin_email }}
         </div>
@@ -266,61 +285,55 @@
                     <td class="right">£{{ monthly_sub|floatformat:2 }}</td>
                     <td class="right">£{{ monthly_sub|floatformat:2 }}</td>
                 </tr>
-                {% if users > 0 %}
                 <tr>
                     <td>Users</td>
                     <td class="right">{{ users }}</td>
                     <td class="right">£{{ per_user|floatformat:2 }}</td>
                     <td class="right">£{{ user_licenses_total|floatformat:2 }}</td>
                 </tr>
-                {% endif %}
             </tbody>
         </table>
 
-        <!-- Bottom section (Payment details and Summary) -->
-        <table class="bottom-table" cellpadding="0" cellspacing="0" width="100%">
+        <!-- Summary row right below items -->
+        <table class="summary-container" cellpadding="0" cellspacing="0">
             <tr>
-                <td colspan="2" valign="bottom">
-                    <div class="section-title">PAYMENT DETAILS</div>
-                </td>
-                <td width="20%"></td>
-                <td width="25%"></td>
+                <td width="55%"></td>
+                <td width="20%" class="summary-label">Subtotal</td>
+                <td width="25%" class="summary-value">£{{ total_amount|floatformat:2 }}</td>
             </tr>
             <tr>
-                <td width="20%" class="payment-label">Account name</td>
-                <td width="35%">Estrada building services</td>
-                <td width="20%" class="summary-label">Subtotal</td>
-                <td width="25%" class="summary-value">£{{ subtotal|floatformat:2 }}</td>
+                <td width="55%"></td>
+                <td width="20%" class="total-box">TOTAL DUE</td>
+                <td width="25%" class="total-box" style="text-align: right;">£{{ total_amount|floatformat:2 }}</td>
+            </tr>
+        </table>
+
+        <!-- Payment details -->
+        <div class="section-title">PAYMENT DETAILS</div>
+        <table class="payment-table" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="payment-label">Account name</td>
+                <td class="payment-value">Estrada building services</td>
             </tr>
             <tr>
                 <td class="payment-label">Bank</td>
-                <td>Santander</td>
-                <td class="summary-label">VAT (20%)</td>
-                <td class="summary-value">£{{ vat_amount|floatformat:2 }}</td>
+                <td class="payment-value">Santander</td>
             </tr>
             <tr>
                 <td class="payment-label">Sort code</td>
-                <td>09-01-28</td>
-                <td class="total-row">TOTAL DUE</td>
-                <td class="total-row right-align">£{{ total_amount|floatformat:2 }}</td>
+                <td class="payment-value">09-01-28</td>
             </tr>
             <tr>
                 <td class="payment-label">Account no.</td>
-                <td>82051171</td>
-                <td></td>
-                <td></td>
+                <td class="payment-value">82051171</td>
             </tr>
             <tr>
                 <td class="payment-label">Reference</td>
-                <td>{{ invoice.invoice_number }}</td>
-                <td></td>
-                <td></td>
+                <td class="payment-value">{{ invoice.invoice_number }}</td>
             </tr>
             <tr>
                 <td class="payment-label">Email</td>
-                <td>info@tresta.cloud</td>
-                <td></td>
-                <td></td>
+                <td class="payment-value">info@tresta.cloud</td>
             </tr>
         </table>
 

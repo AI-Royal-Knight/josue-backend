@@ -1326,12 +1326,13 @@ def seed_demo_data(reset=False):
         # -------------------------------------------------------------
         print_step("15. Seeding Super Admin Monthly Invoices & Activities")
         current_year = date.today().year
+        seeded_amount = Decimal("1690.00")
         MonthlyInvoice.objects.update_or_create(
             company=primary_company,
             year=current_year,
             month=1,
             defaults={
-                "amount": Decimal("1200.00"),
+                "amount": seeded_amount,
                 "is_sent": True,
                 "is_paid": True,
                 "payment_date": timezone.now() - timedelta(days=60),
@@ -1343,7 +1344,7 @@ def seed_demo_data(reset=False):
             year=current_year,
             month=2,
             defaults={
-                "amount": Decimal("1200.00"),
+                "amount": seeded_amount,
                 "is_sent": True,
                 "is_paid": True,
                 "payment_date": timezone.now() - timedelta(days=30),
@@ -1355,7 +1356,7 @@ def seed_demo_data(reset=False):
             year=current_year,
             month=3,
             defaults={
-                "amount": Decimal("1200.00"),
+                "amount": seeded_amount,
                 "is_sent": True,
                 "is_paid": False,
                 "invoice_number": f"TRESTA-INV-{current_year}-03",
