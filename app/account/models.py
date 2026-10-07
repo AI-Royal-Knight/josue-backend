@@ -150,6 +150,10 @@ class UserAccount(
         default=False
     )
 
+    two_factor_enabled = models.BooleanField(
+        default=False
+    )
+
     date_joined = models.DateTimeField(
         default=timezone.now
     )
@@ -474,12 +478,22 @@ class UserProfile(BaseModel):
     digital_signature = models.CharField(max_length=255, blank=True, null=True)
 
     # Bank Details
+    account_name = models.CharField(max_length=255, blank=True, null=True)
     bank_name = models.CharField(max_length=255, blank=True, null=True)
     bank_address = models.CharField(max_length=500, blank=True, null=True)
     sort_code = models.CharField(max_length=50, blank=True, null=True)
     account_number = models.CharField(max_length=100, blank=True, null=True)
     iban = models.CharField(max_length=100, blank=True, null=True)
     swift_bic = models.CharField(max_length=50, blank=True, null=True)
+
+    # Billing & Platform Details (e.g. for super admin invoice generation)
+    vat_number = models.CharField(max_length=100, blank=True, null=True)
+    address = models.CharField(max_length=500, blank=True, null=True)
+    company_name = models.CharField(max_length=255, blank=True, null=True)
+
+    # Security
+    two_factor_enabled = models.BooleanField(default=False)
+
 
     class Meta:
         db_table = "user_profiles"

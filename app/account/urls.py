@@ -2,6 +2,8 @@ from django.urls import path
 from .views import (
     ProfileView,
     LoginView,
+    Verify2FAView,
+    Resend2FAView,
     LogoutView,
     SendInvitationView,
     AllowedInviteRolesView,
@@ -23,6 +25,10 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='Login View'),
+    path('login/verify-2fa/', Verify2FAView.as_view(), name='Verify 2FA'),
+    path('login/resend-2fa/', Resend2FAView.as_view(), name='Resend 2FA'),
+    path('verify-2fa/', Verify2FAView.as_view(), name='Verify 2FA Alias'),
+    path('resend-2fa/', Resend2FAView.as_view(), name='Resend 2FA Alias'),
     path('logout/', LogoutView.as_view(), name='Logout View'),
     path('refresh/', TokenRefreshView.as_view(), name='Token Refresh'),
     path('profile/', ProfileView.as_view(), name='Profile View'),

@@ -74,6 +74,7 @@ def generate_and_send_monthly_invoices(company_id=None, force=False, target_year
                     "company": company,
                     "admin_user": admin_user,
                     "invoice": invoice,
+                    "billing": InvoiceService.get_super_admin_billing_details(),
                     "total_amount": total_amount,
                     "monthly_sub": monthly_sub,
                     "per_user": per_user,

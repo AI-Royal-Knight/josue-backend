@@ -152,3 +152,67 @@ class SnagListFixesTestCase(TestCase):
         res_invite = SendInvitationView.as_view()(req_invite)
         self.assertEqual(res_invite.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_two_factor_auth_login_flow(self):
+        """When two_factor_enabled is True, login requires OTP sent to user's email."""
+        from django.core.cache import cache
+        from app.account.views import Verify2FAView, Resend2FAView
+
+        user_2fa = UserAccount.objects.create_user(
+            email="twofa_user@tresta.cloud",
+            password="StrongPassword123!",
+            first_name="Secure",
+            last_name="User",
+            role=UserAccount.Role.SUPER_ADMIN,
+            two_factor_enabled=True,
+        )
+
+        # 1. Login attempt without OTP
+        req_login = self.factory.post(
+            '/api/v1/account/login/',
+            {
+                'email': 'twofa_user@tresta.cloud',
+                'password': 'StrongPassword123!',
+            },
+            format='json'
+        )
+        res_login = LoginView.as_view()(req_login)
+        self.assertEqual(res_login.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_login.data.get('requires_2fa'))
+        self.assertEqual(res_login.data.get('email'), 'twofa_user@tresta.cloud')
+
+        # Check OTP exists in cache
+        cached_otp = cache.get("2fa_otp_twofa_user@tresta.cloud")
+        self.assertIsNotNone(cached_otp)
+        self.assertEqual(len(cached_otp), 6)
+
+        # 2. Verify with wrong OTP
+        req_verify_bad = self.factory.post(
+            '/api/v1/account/login/verify-2fa/',
+            {
+                'email': 'twofa_user@tresta.cloud',
+                'otp': '000000',
+            },
+            format='json'
+        )
+        res_verify_bad = Verify2FAView.as_view()(req_verify_bad)
+        self.assertEqual(res_verify_bad.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # 3. Verify with correct OTP
+        req_verify_good = self.factory.post(
+            '/api/v1/account/login/verify-2fa/',
+            {
+                'email': 'twofa_user@tresta.cloud',
+                'otp': cached_otp,
+            },
+            format='json'
+        )
+        res_verify_good = Verify2FAView.as_view()(req_verify_good)
+        self.assertEqual(res_verify_good.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_verify_good.data.get('success'))
+        self.assertIn('access_token', res_verify_good.data)
+        self.assertEqual(res_verify_good.data['user']['email'], 'twofa_user@tresta.cloud')
+
+        # Check OTP was consumed from cache
+        self.assertIsNone(cache.get("2fa_otp_twofa_user@tresta.cloud"))
+
+

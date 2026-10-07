@@ -10,7 +10,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'sssts_smsts', 'profession', 'emergency_contact_name', 'emergency_contact_number',
             'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature',
             'ni_number', 'utr', 'passport_number', 'passport_expiry_date', 'passport_document',
-            'bank_name', 'bank_address', 'sort_code', 'account_number', 'iban', 'swift_bic'
+            'account_name', 'bank_name', 'bank_address', 'sort_code', 'account_number', 'iban', 'swift_bic',
+            'vat_number', 'address', 'company_name', 'two_factor_enabled'
         ]
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -42,7 +43,8 @@ class UserSerializer(serializers.ModelSerializer):
             'profile',
             'company',
             'assigned_companies',
-            'stats'
+            'stats',
+            'two_factor_enabled',
         ]
         
     assigned_companies = serializers.SerializerMethodField()
@@ -69,6 +71,17 @@ class UserSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField()
+    otp = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class Verify2FASerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6)
+
+
+class Resend2FASerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
 
 
 class SendInvitationSerializer(serializers.Serializer):

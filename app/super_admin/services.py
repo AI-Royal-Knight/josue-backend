@@ -87,3 +87,57 @@ class InvoiceService:
             "total_amount": total_amount,
         }
 
+    @staticmethod
+    def get_super_admin_billing_details():
+        """
+        Retrieves the billing / bank details from the super admin's profile.
+        Falls back to default Tresta / Estrada values if fields are unset.
+        """
+        from app.account.models import UserAccount, UserProfile
+        super_admin = UserAccount.objects.filter(role=UserAccount.Role.SUPER_ADMIN).first()
+        defaults = {
+            "company_name": "Tresta",
+            "account_name": "Estrada building services",
+            "bank_name": "Santander",
+            "sort_code": "09-01-28",
+            "account_number": "82051171",
+            "vat_number": "237 5409 01",
+            "address": "84 Alers Road\nBexleyheath, DA6 8HT",
+            "email": "info@tresta.cloud",
+            "iban": "",
+            "swift_bic": "",
+        }
+
+        if not super_admin:
+            return defaults
+
+        try:
+            profile = super_admin.profile
+        except Exception:
+            profile, _ = UserProfile.objects.get_or_create(
+                user=super_admin,
+                defaults={
+                    "company_name": defaults["company_name"],
+                    "account_name": defaults["account_name"],
+                    "bank_name": defaults["bank_name"],
+                    "sort_code": defaults["sort_code"],
+                    "account_number": defaults["account_number"],
+                    "vat_number": defaults["vat_number"],
+                    "address": defaults["address"],
+                    "bank_address": defaults["address"],
+                }
+            )
+
+        return {
+            "company_name": profile.company_name or defaults["company_name"],
+            "account_name": profile.account_name or defaults["account_name"],
+            "bank_name": profile.bank_name or defaults["bank_name"],
+            "sort_code": profile.sort_code or defaults["sort_code"],
+            "account_number": profile.account_number or defaults["account_number"],
+            "vat_number": profile.vat_number or defaults["vat_number"],
+            "address": profile.address or profile.bank_address or defaults["address"],
+            "email": super_admin.email or defaults["email"],
+            "iban": profile.iban or "",
+            "swift_bic": profile.swift_bic or "",
+        }
+

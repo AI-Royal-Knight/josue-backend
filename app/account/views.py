@@ -19,6 +19,8 @@ from core.utils import get_frontend_url, get_default_from_email
 
 from .serializers import (
     LoginSerializer,
+    Verify2FASerializer,
+    Resend2FASerializer,
     SendInvitationSerializer,
     AcceptInvitationSerializer,
     ForgotPasswordSerializer,
@@ -71,6 +73,9 @@ class ProfileView(APIView):
         if "backup_email" in data:
             user.backup_email = data["backup_email"]
             
+        if "two_factor_enabled" in data:
+            user.two_factor_enabled = bool(data["two_factor_enabled"])
+            
         user.save()
 
         # Update profile info
@@ -97,13 +102,20 @@ class ProfileView(APIView):
                 'sssts_smsts', 'profession', 'emergency_contact_name', 'emergency_contact_number',
                 'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature',
                 'ni_number', 'utr', 'passport_number', 'passport_expiry_date',
-                'bank_name', 'bank_address', 'sort_code', 'account_number', 'iban', 'swift_bic'
+                'bank_name', 'bank_address', 'sort_code', 'account_number', 'iban', 'swift_bic',
+                'account_name', 'vat_number', 'address', 'company_name', 'two_factor_enabled'
             ]:
                 if field in profile_data:
                     val = profile_data[field]
                     if val == "" and field.endswith('_date'):
                         val = None
                     setattr(profile, field, val)
+
+            if 'two_factor_enabled' in profile_data:
+                user.two_factor_enabled = bool(profile_data['two_factor_enabled'])
+                user.save()
+            elif "two_factor_enabled" in data:
+                profile.two_factor_enabled = user.two_factor_enabled
                     
             if 'passport_document' in request.FILES:
                 profile.passport_document = request.FILES['passport_document']
@@ -194,8 +206,111 @@ class LogoutView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _build_login_response(user):
+    tokens = get_tokens_for_user(user)
+
+    from app.account.models import RoleAssignment
+    assignments = RoleAssignment.objects.filter(user=user)
+    role_assignments_data = [
+        {
+            "id": str(a.id),
+            "role": a.role,
+            "company_id": str(a.company_id) if a.company_id else None,
+            "project_id": str(a.project_id) if a.project_id else None,
+        }
+        for a in assignments
+    ]
+
+    response_data = {
+        "success": True,
+        "access_token": tokens["access"],
+        "refresh_token": tokens["refresh"],
+        "user": {
+            "role": user.role,
+            "secondary_role": getattr(user, 'secondary_role', None),
+            "email": user.email,
+            "first_name": user.first_name or "",
+            "last_name": user.last_name or "",
+            "role_assignments": role_assignments_data,
+        }
+    }
+
+    if user.role == 'employee':
+        from django.utils import timezone
+        from app.employee.models import AttendanceLog
+        today = timezone.now().date()
+        is_checked_in = AttendanceLog.objects.filter(
+            user=user,
+            date=today,
+            status='checked_in'
+        ).exists()
+        response_data["user"]["checked_in"] = is_checked_in
+
+    return response_data
+
+
+def _send_2fa_otp(user):
+    otp = f"{random.randint(100000, 999999)}"
+    cache.set(f"2fa_otp_{user.email}", otp, timeout=300)
+
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Two-Step Verification OTP generated for {user.email}: {otp}")
+
+    subject = "Your Two-Step Verification Code"
+    message = (
+        f"Hello {user.first_name or 'there'},\n\n"
+        f"Your two-step verification code is: {otp}\n\n"
+        f"This code will expire in 5 minutes.\n\n"
+        f"If you did not request this code, someone may be attempting to sign in to your account.\n\n"
+        f"Thank you,\nTresta Security"
+    )
+
+    html_message = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px; margin: 0; color: #3f3f46;">
+        <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            <div style="background-color: #0f172a; padding: 28px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 600; letter-spacing: 0.5px;">TWO-STEP VERIFICATION</h1>
+            </div>
+            <div style="padding: 36px 30px;">
+                <p style="margin-top: 0; font-size: 15px; line-height: 24px; color: #334155;">Hello <strong>{user.first_name or 'there'}</strong>,</p>
+                <p style="font-size: 15px; line-height: 24px; color: #334155;">Please enter this 6-digit verification code to complete your sign in:</p>
+                
+                <div style="text-align: center; margin: 28px 0;">
+                    <div style="display: inline-block; background-color: #f1f5f9; border: 1px solid #cbd5e1; color: #0f172a; padding: 14px 28px; border-radius: 8px; font-size: 32px; font-weight: 700; letter-spacing: 10px; font-family: monospace;">
+                        {otp}
+                    </div>
+                </div>
+                
+                <p style="font-size: 13px; line-height: 20px; color: #64748b; margin-top: 25px;">This verification code is valid for <strong>5 minutes</strong>. If you did not attempt to sign in, please secure your account immediately.</p>
+            </div>
+            <div style="background-color: #f8fafc; padding: 16px; text-align: center; border-top: 1px solid #e2e8f0;">
+                <p style="margin: 0; font-size: 12px; color: #94a3b8;">&copy; 2026 Tresta. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    try:
+        send_mail(
+            subject,
+            message,
+            get_default_from_email(),
+            [user.email],
+            fail_silently=True,
+            html_message=html_message,
+        )
+    except Exception as e:
+        logger.error(f"Failed to send 2FA email to {user.email}: {e}")
+
+    return otp
+
+
 class LoginView(APIView):
-    """Authenticate with email + password; returns JWT pair."""
+    """Authenticate with email + password; supports 2FA OTP verification."""
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(request=LoginSerializer, responses={200: dict})
@@ -209,6 +324,7 @@ class LoginView(APIView):
 
         email = serializer.validated_data["email"]
         password = serializer.validated_data["password"]
+        otp = serializer.validated_data.get("otp", "").strip()
 
         user = UserAccount.objects.filter(email=email).first()
         
@@ -239,46 +355,81 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        tokens = get_tokens_for_user(user)
+        is_2fa_enabled = bool(
+            user.two_factor_enabled or
+            getattr(getattr(user, 'profile', None), 'two_factor_enabled', False)
+        )
 
-        from app.account.models import RoleAssignment
-        assignments = RoleAssignment.objects.filter(user=user)
-        role_assignments_data = [
-            {
-                "id": str(a.id),
-                "role": a.role,
-                "company_id": str(a.company_id) if a.company_id else None,
-                "project_id": str(a.project_id) if a.project_id else None,
-            }
-            for a in assignments
-        ]
+        if is_2fa_enabled:
+            if otp:
+                cached_otp = cache.get(f"2fa_otp_{user.email}")
+                if not cached_otp or str(cached_otp).strip() != str(otp).strip():
+                    return Response(
+                        {"error": "Invalid or expired verification code."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                cache.delete(f"2fa_otp_{user.email}")
+            else:
+                _send_2fa_otp(user)
+                return Response({
+                    "success": True,
+                    "requires_2fa": True,
+                    "email": user.email,
+                    "message": "A two-step verification code has been sent to your email.",
+                }, status=status.HTTP_200_OK)
 
-        response_data = {
+        return Response(_build_login_response(user), status=status.HTTP_200_OK)
+
+
+class Verify2FAView(APIView):
+    """Verifies a 2FA OTP code and returns JWT credentials."""
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=Verify2FASerializer, responses={200: dict})
+    def post(self, request):
+        serializer = Verify2FASerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        otp = serializer.validated_data["otp"].strip()
+
+        user = UserAccount.objects.filter(email=email).first()
+        if not user:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not user.is_active:
+            return Response({"error": "Account is not active."}, status=status.HTTP_403_FORBIDDEN)
+
+        cached_otp = cache.get(f"2fa_otp_{email}")
+        if not cached_otp or str(cached_otp).strip() != str(otp).strip():
+            return Response({"error": "Invalid or expired verification code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        cache.delete(f"2fa_otp_{email}")
+        return Response(_build_login_response(user), status=status.HTTP_200_OK)
+
+
+class Resend2FAView(APIView):
+    """Resends a 2FA OTP code to the user's email."""
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=Resend2FASerializer, responses={200: dict})
+    def post(self, request):
+        serializer = Resend2FASerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": _first_error(serializer)}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+        user = UserAccount.objects.filter(email=email).first()
+        if not user or not user.is_active:
+            return Response({"error": "Unable to send verification code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        _send_2fa_otp(user)
+        return Response({
             "success": True,
-            "access_token": tokens["access"],
-            "refresh_token": tokens["refresh"],
-            "user": {
-                "role": user.role,
-                "secondary_role": getattr(user, 'secondary_role', None),
-                "email": user.email,
-                "first_name": user.first_name or "",
-                "last_name": user.last_name or "",
-                "role_assignments": role_assignments_data,
-            }
-        }
+            "message": "A new verification code has been sent to your email."
+        }, status=status.HTTP_200_OK)
 
-        if user.role == 'employee':
-            from django.utils import timezone
-            from app.employee.models import AttendanceLog
-            today = timezone.now().date()
-            is_checked_in = AttendanceLog.objects.filter(
-                user=user,
-                date=today,
-                status='checked_in'
-            ).exists()
-            response_data["user"]["checked_in"] = is_checked_in
-
-        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class SendInvitationView(APIView):

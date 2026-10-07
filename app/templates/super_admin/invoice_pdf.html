@@ -195,13 +195,13 @@
     <!-- Header area -->
     <table cellpadding="0" cellspacing="0" class="header-table">
         <tr>
-            <td class="header-left" valign="middle">tresta</td>
+            <td class="header-left" valign="middle">{{ billing.company_name|lower }}</td>
             <td class="header-right" valign="middle">INVOICE</td>
         </tr>
     </table>
     
     <div class="header-sub-strip">
-        Tresta | Part of Estrada Building Services Ltd
+        {{ billing.company_name }} | Part of {{ billing.account_name }}
     </div>
 
     <div class="content">
@@ -210,11 +210,9 @@
             <tr>
                 <td width="55%" valign="top">
                     <div class="section-title">FROM</div>
-                    <span style="font-size: 11pt; font-weight: bold;">Tresta</span><br>
-                    84 Alers Road<br>
-                    <br>
-                    Bexleyheath, DA6 8HT<br>
-                    info@tresta.cloud
+                    <span style="font-size: 11pt; font-weight: bold;">{{ billing.company_name }}</span><br>
+                    {{ billing.address|linebreaksbr }}<br>
+                    {{ billing.email }}
                 </td>
                 <td width="45%" valign="top">
                     <table class="meta-table" cellspacing="0" cellpadding="0">
@@ -236,7 +234,7 @@
                         </tr>
                         <tr>
                             <td class="meta-label">VAT no.</td>
-                            <td class="meta-value">237 5409 01</td>
+                            <td class="meta-value">{{ billing.vat_number }}</td>
                         </tr>
                     </table>
                 </td>
@@ -313,33 +311,45 @@
         <table class="payment-table" cellpadding="0" cellspacing="0">
             <tr>
                 <td class="payment-label">Account name</td>
-                <td class="payment-value">Estrada building services</td>
+                <td class="payment-value">{{ billing.account_name }}</td>
             </tr>
             <tr>
                 <td class="payment-label">Bank</td>
-                <td class="payment-value">Santander</td>
+                <td class="payment-value">{{ billing.bank_name }}</td>
             </tr>
             <tr>
                 <td class="payment-label">Sort code</td>
-                <td class="payment-value">09-01-28</td>
+                <td class="payment-value">{{ billing.sort_code }}</td>
             </tr>
             <tr>
                 <td class="payment-label">Account no.</td>
-                <td class="payment-value">82051171</td>
+                <td class="payment-value">{{ billing.account_number }}</td>
             </tr>
+            {% if billing.iban %}
+            <tr>
+                <td class="payment-label">IBAN</td>
+                <td class="payment-value">{{ billing.iban }}</td>
+            </tr>
+            {% endif %}
+            {% if billing.swift_bic %}
+            <tr>
+                <td class="payment-label">SWIFT / BIC</td>
+                <td class="payment-value">{{ billing.swift_bic }}</td>
+            </tr>
+            {% endif %}
             <tr>
                 <td class="payment-label">Reference</td>
                 <td class="payment-value">{{ invoice.invoice_number }}</td>
             </tr>
             <tr>
                 <td class="payment-label">Email</td>
-                <td class="payment-value">info@tresta.cloud</td>
+                <td class="payment-value">{{ billing.email }}</td>
             </tr>
         </table>
 
         <div class="footer">
-            <div class="footer-line-1">Tresta is part of the Estrada Building Services group.</div>
-            <div class="footer-line-2">Estrada Building Services Ltd | Company no. 09587216 | VAT registration no. 237 5409 01</div>
+            <div class="footer-line-1">{{ billing.company_name }} is part of the {{ billing.account_name }} group.</div>
+            <div class="footer-line-2">{{ billing.account_name }} | VAT registration no. {{ billing.vat_number }}</div>
         </div>
 
     </div>
