@@ -434,6 +434,12 @@ class Company(BaseModel):
         null=True,
     )
 
+    terms_and_conditions_document = models.FileField(
+        upload_to="companies/terms/",
+        blank=True,
+        null=True,
+    )
+
     # Statistics
     user = models.PositiveIntegerField(
         default=0,
@@ -517,6 +523,8 @@ class UserProfile(BaseModel):
     passport_number = models.CharField(max_length=100, blank=True, null=True)
     passport_expiry_date = models.DateField(blank=True, null=True)
     passport_document = models.FileField(upload_to="profiles/documents/", blank=True, null=True)
+    drivers_license_document = models.FileField(upload_to="profiles/documents/", blank=True, null=True)
+    cscs_card_document = models.FileField(upload_to="profiles/documents/", blank=True, null=True)
     
     is_approved = models.BooleanField(default=False)
     approved_by = models.ForeignKey(UserAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_profiles")

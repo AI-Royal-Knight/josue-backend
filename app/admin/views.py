@@ -48,6 +48,13 @@ class AdminProfileView(APIView):
         serializer = AdminProfileUpdateSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            
+            # Handle terms_and_conditions_document file upload for the associated company
+            company = request.user.company
+            if company and 'terms_and_conditions_document' in request.FILES:
+                company.terms_and_conditions_document = request.FILES['terms_and_conditions_document']
+                company.save()
+                
             return Response(AdminProfileSerializer(request.user).data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

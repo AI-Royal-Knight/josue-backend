@@ -10,6 +10,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'sssts_smsts', 'profession', 'emergency_contact_name', 'emergency_contact_number',
             'categories', 'insurance_policy', 'employer_liability', 'terms_accepted', 'digital_signature',
             'ni_number', 'utr', 'passport_number', 'passport_expiry_date', 'passport_document',
+            'drivers_license_document', 'cscs_card_document',
             'account_name', 'bank_name', 'bank_address', 'sort_code', 'account_number', 'iban', 'swift_bic',
             'vat_number', 'address', 'company_name', 'two_factor_enabled'
         ]
@@ -22,7 +23,7 @@ class CompanySerializer(serializers.ModelSerializer):
             'vat_number', 'phone', 'utr', 'bank_name', 'bank_address', 'sort_code', 'account_number',
             'iban', 'swift_bic', 'public_liability_policy', 'public_liability_expiry', 
             'public_liability_document', 'employers_liability_policy', 'employers_liability_expiry', 
-            'employers_liability_document'
+            'employers_liability_document', 'terms_and_conditions_document'
         ]
 
 class UserSerializer(serializers.ModelSerializer):
@@ -111,7 +112,8 @@ class AcceptInvitationSerializer(serializers.Serializer):
     company_name = serializers.CharField(required=False) # For Admin/Supplier
     profession = serializers.CharField(required=False)
     cscs_card_no = serializers.CharField(required=False)
-    # etc...
+    digital_signature = serializers.CharField(required=False)
+    terms_accepted = serializers.BooleanField(required=False, default=False)
 
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()

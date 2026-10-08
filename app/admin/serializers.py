@@ -9,7 +9,8 @@ class CompanySerializer(serializers.ModelSerializer):
             'company_number', 'building_number', 'street', 
             'postcode', 'vat_number', 'status',
             'bank_name', 'bank_address', 'sort_code', 
-            'account_number', 'iban', 'swift_bic', 'attachment'
+            'account_number', 'iban', 'swift_bic', 'attachment',
+            'terms_and_conditions_document'
         ]
 
 class AdminProfileSerializer(serializers.ModelSerializer):
@@ -29,7 +30,8 @@ class CompanyUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'company_name', 'phone', 'company_number', 'building_number', 
             'street', 'postcode', 'vat_number', 'bank_name', 'bank_address', 
-            'sort_code', 'account_number', 'iban', 'swift_bic', 'attachment'
+            'sort_code', 'account_number', 'iban', 'swift_bic', 'attachment',
+            'terms_and_conditions_document'
         ]
 
 class AdminProfileUpdateSerializer(serializers.ModelSerializer):

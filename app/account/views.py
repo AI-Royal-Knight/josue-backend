@@ -123,6 +123,10 @@ class ProfileView(APIView):
                     
             if 'passport_document' in request.FILES:
                 profile.passport_document = request.FILES['passport_document']
+            if 'drivers_license_document' in request.FILES:
+                profile.drivers_license_document = request.FILES['drivers_license_document']
+            if 'cscs_card_document' in request.FILES:
+                profile.cscs_card_document = request.FILES['cscs_card_document']
                 
             profile.save()
 
@@ -136,7 +140,7 @@ class ProfileView(APIView):
         else:
             company_data = company_data_raw
             
-        has_company_files = any(f in request.FILES for f in ['public_liability_document', 'employers_liability_document', 'company_logo', 'attachment'])
+        has_company_files = any(f in request.FILES for f in ['public_liability_document', 'employers_liability_document', 'company_logo', 'attachment', 'terms_and_conditions_document'])
         if company_data or has_company_files:
             from .models import Company, RoleAssignment
             company_name = company_data.get('company_name', '').strip() if company_data else ''
@@ -185,6 +189,8 @@ class ProfileView(APIView):
                 company.company_logo = request.FILES['company_logo']
             if 'attachment' in request.FILES:
                 company.attachment = request.FILES['attachment']
+            if 'terms_and_conditions_document' in request.FILES:
+                company.terms_and_conditions_document = request.FILES['terms_and_conditions_document']
                 
             company.save()
 
@@ -647,13 +653,32 @@ class AcceptInvitationView(APIView):
 
         # Create UserProfile for employees so document controller can review & approve
         if is_employee:
-            UserProfile.objects.get_or_create(
+            profile, _ = UserProfile.objects.get_or_create(
                 user=user,
                 defaults={
-                    'profession': 'employee',
+                    'profession': serializer.validated_data.get('profession', 'employee'),
                     'is_approved': False,
+                    'cscs_card_no': serializer.validated_data.get('cscs_card_no', ''),
+                    'digital_signature': serializer.validated_data.get('digital_signature', ''),
+                    'terms_accepted': serializer.validated_data.get('terms_accepted', False),
                 }
             )
+            
+            # If it already existed but this is acceptance, we might want to update fields anyway
+            profile.profession = serializer.validated_data.get('profession', profile.profession)
+            profile.cscs_card_no = serializer.validated_data.get('cscs_card_no', profile.cscs_card_no)
+            profile.digital_signature = serializer.validated_data.get('digital_signature', profile.digital_signature)
+            profile.terms_accepted = serializer.validated_data.get('terms_accepted', profile.terms_accepted)
+            
+            # Save files
+            if 'cscs_card_document' in request.FILES:
+                profile.cscs_card_document = request.FILES['cscs_card_document']
+            if 'passport_document' in request.FILES:
+                profile.passport_document = request.FILES['passport_document']
+            if 'drivers_license_document' in request.FILES:
+                profile.drivers_license_document = request.FILES['drivers_license_document']
+                
+            profile.save()
 
         # If supplier, ensure SupplierProfile and CompanySupplier link are created
         if invitation.role == UserAccount.Role.SUPPLIER:
