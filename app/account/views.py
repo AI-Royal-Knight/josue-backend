@@ -595,11 +595,18 @@ class ValidateInvitationView(APIView):
             if invitation.is_expired():
                 return Response({"error": "Invitation expired"}, status=status.HTTP_400_BAD_REQUEST)
                 
+            company = invitation.company
+            tc_url = None
+            if company and company.terms_and_conditions_document:
+                tc_url = request.build_absolute_uri(company.terms_and_conditions_document.url)
+
             return Response({
                 "email": invitation.email,
                 "role": invitation.role,
                 "company_id": invitation.company_id,
-                "project_id": invitation.project_id
+                "project_id": invitation.project_id,
+                "terms_and_conditions_url": tc_url,
+                "company_name": company.company_name if company else None
             })
         except Invitation.DoesNotExist:
             return Response({"error": "Invalid token"}, status=status.HTTP_404_NOT_FOUND)
@@ -1052,7 +1059,11 @@ class UsersListView(APIView):
                 "expiryDate": "",
                 "expiryTone": expiry_tone,
                 "approvedUser": profile.is_approved if profile else False,
-                "approvedBy": dict(UserAccount.Role.choices).get(profile.approved_by.role, profile.approved_by.role) if profile and profile.approved_by else ""
+                "approvedBy": dict(UserAccount.Role.choices).get(profile.approved_by.role, profile.approved_by.role) if profile and profile.approved_by else "",
+                "digitalSignature": profile.digital_signature if profile else None,
+                "termsAccepted": profile.terms_accepted if profile else False,
+                "passportDocumentUrl": request.build_absolute_uri(profile.passport_document.url) if profile and profile.passport_document else None,
+                "cscsCardDocumentUrl": request.build_absolute_uri(profile.cscs_card_document.url) if profile and profile.cscs_card_document else None
             })
             
         return Response(result)
