@@ -64,9 +64,15 @@ class RFI(BaseModel):
 
     def save(self, *args, **kwargs):
         if not self.rfi_number:
-            # Auto-generate rfi_number scoped to project
-            count = RFI.objects.filter(project=self.project).count()
-            self.rfi_number = f"#{str(count + 1).zfill(3)}"
+            # Auto-generate rfi_number scoped to project using max existing to avoid duplicates
+            import re as _re
+            existing = RFI.objects.filter(project=self.project).values_list('rfi_number', flat=True)
+            max_num = 0
+            for num_str in existing:
+                m = _re.search(r'(\d+)', num_str or '')
+                if m:
+                    max_num = max(max_num, int(m.group(1)))
+            self.rfi_number = f"#{str(max_num + 1).zfill(3)}"
             
         if self.status == 'CLOSED' and not self.closed_at:
             self.closed_at = timezone.now()

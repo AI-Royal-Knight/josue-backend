@@ -931,11 +931,11 @@ class DashboardRFIListView(APIView):
         except Project.DoesNotExist:
             return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
             
-        if user.role in ["admin", "project_admin", "super_admin"]:
+        if user.role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"]:
             if project.company != user.company:
                 return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
         else:
-            if project not in user.accessible_projects:
+            if not user.accessible_projects.filter(id=project.id).exists():
                 return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
                 
         description = request.data.get('description', '')
@@ -946,9 +946,10 @@ class DashboardRFIListView(APIView):
         if document:
             from cloudinary.uploader import upload
             try:
-                upload_data = upload(document)
+                upload_data = upload(document, resource_type="auto")
                 document_url = upload_data.get('secure_url')
-            except Exception:
+            except Exception as e:
+                print("Cloudinary upload failed for RFI creation:", str(e))
                 pass
                 
         rfi = RFI.objects.create(
@@ -1000,10 +1001,11 @@ class RFIMessageCreateView(APIView):
         if attachment:
             from cloudinary.uploader import upload
             try:
-                upload_data = upload(attachment)
+                upload_data = upload(attachment, resource_type="auto")
                 message.document_url = upload_data.get('secure_url')
                 message.save()
             except Exception as e:
+                print("Cloudinary upload failed for RFI message:", str(e))
                 pass
                 
         serializer = RFIMessageSerializer(message)
@@ -1015,7 +1017,7 @@ class RFIAssignTechnicalView(APIView):
     @extend_schema(request=dict, responses={200: dict})
     def patch(self, request, pk):
         user = request.user
-        if user.role not in ["contracts_manager", "manager", "managers", "supervisor", "admin", "project_admin", "super_admin"]:
+        if user.role not in ["contracts_manager", "manager", "managers", "supervisor", "admin", "project_admin", "super_admin", "managing_director", "project_director"]:
             return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
 
         try:
