@@ -28,6 +28,10 @@ class Variation(BaseModel):
 
     total_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
 
+    # Client details
+    client_name = models.CharField(max_length=200, blank=True, default="")
+    client_email = models.EmailField(blank=True, default="")
+
     # Approval
     approval_status = models.CharField(
         max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.PENDING

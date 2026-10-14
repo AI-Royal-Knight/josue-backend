@@ -428,7 +428,7 @@ def seed_demo_data(reset=False):
         # Assign all project users and role assignments
         for project in projects:
             for role_name, user in users_by_role.items():
-                if role_name == UserAccount.Role.SUPER_ADMIN:
+                if role_name in [UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN, UserAccount.Role.MANAGING_DIRECTOR]:
                     continue
                 user.assigned_projects.add(project)
                 RoleAssignment.objects.get_or_create(

@@ -103,6 +103,25 @@ class SendInvitationSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"The '{value}' role cannot be assigned via invitation.")
         return value
 
+    def validate(self, attrs):
+        role = attrs.get('role')
+        secondary_role = attrs.get('secondary_role')
+        single_roles = {
+            UserAccount.Role.SUPER_ADMIN,
+            UserAccount.Role.ADMIN,
+            UserAccount.Role.PROJECT_ADMIN,
+            UserAccount.Role.MANAGING_DIRECTOR,
+        }
+        if role in single_roles and secondary_role:
+            raise serializers.ValidationError({
+                "secondary_role": f"Users with role '{role}' cannot have a secondary role."
+            })
+        if secondary_role in single_roles:
+            raise serializers.ValidationError({
+                "secondary_role": f"Role '{secondary_role}' cannot be assigned as a secondary role."
+            })
+        return attrs
+
 class AcceptInvitationSerializer(serializers.Serializer):
     token = serializers.UUIDField()
     first_name = serializers.CharField()

@@ -588,15 +588,15 @@ class ProjectRoleAssignmentsView(APIView):
             old_assignments = RoleAssignment.objects.filter(role=role_key, project=project)
             old_user_ids = list(old_assignments.values_list('user_id', flat=True))
 
-            # Validation: Admin, Super Admin, and Project Admin are mutually exclusive with all other project roles
-            top_roles = ["project_admin", "admin", "super_admin"]
+            # Validation: Admin, Super Admin, Project Admin, and Managing Director are mutually exclusive with all other project roles
+            top_roles = ["project_admin", "admin", "super_admin", "managing_director"]
             
             # Check newly assigned users
             new_users = users.exclude(id__in=old_user_ids)
             for user in new_users:
-                if user.role in ["admin", "super_admin"]:
+                if user.role in ["admin", "super_admin", "managing_director"]:
                     return Response(
-                        {"error": f"User {user.email} is an Admin and cannot be assigned to project roles."},
+                        {"error": f"User {user.email} is a {user.role.replace('_', ' ').title()} and cannot be assigned to project roles."},
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
@@ -605,13 +605,18 @@ class ProjectRoleAssignmentsView(APIView):
                 if role_key in top_roles:
                     if existing_roles.exists():
                         return Response(
-                            {"error": f"User {user.email} is already assigned to another role in this project and cannot be a Project Admin."}, 
+                            {"error": f"User {user.email} is already assigned to another role in this project and cannot be a {role_key.replace('_', ' ').title()}."}, 
                             status=status.HTTP_400_BAD_REQUEST
                         )
                 else:
                     if "project_admin" in existing_roles or user.role == "project_admin":
                         return Response(
                             {"error": f"User {user.email} is a Project Admin and cannot be assigned to another role."}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    if "managing_director" in existing_roles or user.role == "managing_director":
+                        return Response(
+                            {"error": f"User {user.email} is a Managing Director and cannot be assigned to another role."}, 
                             status=status.HTTP_400_BAD_REQUEST
                         )
 

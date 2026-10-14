@@ -216,13 +216,18 @@ class UserAccount(
         super().clean()
         from django.core.exceptions import ValidationError
         
-        # Enforce rule: super_admin, admin, project_admin can only have one role
-        if self.role in [self.Role.SUPER_ADMIN, self.Role.ADMIN, self.Role.PROJECT_ADMIN]:
+        # Enforce rule: super_admin, admin, project_admin, managing_director can only have one role
+        if self.role in [self.Role.SUPER_ADMIN, self.Role.ADMIN, self.Role.PROJECT_ADMIN, self.Role.MANAGING_DIRECTOR]:
             if self.secondary_role:
                 raise ValidationError({
                     "secondary_role": f"Users with role '{self.role}' cannot have a secondary role."
                 })
-        
+
+        if self.secondary_role in [self.Role.SUPER_ADMIN, self.Role.ADMIN, self.Role.PROJECT_ADMIN, self.Role.MANAGING_DIRECTOR]:
+            raise ValidationError({
+                "secondary_role": f"Role '{self.secondary_role}' cannot be assigned as a secondary role."
+            })
+
         # Ensure roles are distinct
         if self.role and self.secondary_role and self.role == self.secondary_role:
             raise ValidationError({

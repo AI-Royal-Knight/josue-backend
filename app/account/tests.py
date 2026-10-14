@@ -268,5 +268,61 @@ class SnagListFixesTestCase(TestCase):
         self.assertEqual(res_verify_old.status_code, status.HTTP_200_OK)
         self.assertTrue(res_verify_old.data.get('success'))
 
+    def test_managing_director_single_role_and_no_other_dashboards(self):
+        """Managing director cannot have secondary role, cannot be secondary role, cannot be assigned project roles, and login response never has role_assignments."""
+        from django.core.exceptions import ValidationError
+        from app.account.models import RoleAssignment
+
+        # 1. MD cannot have a secondary role
+        md_user = UserAccount(
+            email="md_test@acme.com",
+            role=UserAccount.Role.MANAGING_DIRECTOR,
+            secondary_role=UserAccount.Role.MANAGERS,
+            company=self.company
+        )
+        with self.assertRaises(ValidationError):
+            md_user.clean()
+
+        # 2. Another user cannot have MD as secondary role
+        mgr_user = UserAccount(
+            email="mgr_test@acme.com",
+            role=UserAccount.Role.MANAGERS,
+            secondary_role=UserAccount.Role.MANAGING_DIRECTOR,
+            company=self.company
+        )
+        with self.assertRaises(ValidationError):
+            mgr_user.clean()
+
+        # 3. Create valid MD user and test login response
+        md = UserAccount.objects.create_user(
+            email="md_valid@acme.com",
+            password="StrongPassword123!",
+            role=UserAccount.Role.MANAGING_DIRECTOR,
+            company=self.company
+        )
+        
+        req_login = self.factory.post(
+            '/api/v1/account/login/',
+            {'email': 'md_valid@acme.com', 'password': 'StrongPassword123!'},
+            format='json'
+        )
+        res_login = LoginView.as_view()(req_login)
+        self.assertEqual(res_login.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_login.data['user']['role'], UserAccount.Role.MANAGING_DIRECTOR)
+        self.assertIsNone(res_login.data['user']['secondary_role'])
+        self.assertEqual(res_login.data['user']['role_assignments'], [])
+
+        # 4. Attempt to assign MD user to a project role (e.g. contracts_manager) must fail
+        req_assign = self.factory.post(
+            f'/api/v1/project-admin/projects/{self.project.pk}/roles/',
+            {'role_key': 'contracts_manager', 'user_ids': [str(md.pk)]},
+            format='json'
+        )
+        force_authenticate(req_assign, user=self.project_admin)
+        res_assign = ProjectRoleAssignmentsView.as_view()(req_assign, pk=self.project.pk)
+        self.assertEqual(res_assign.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Managing Director", res_assign.data.get('error', ''))
+
+
 
 

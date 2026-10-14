@@ -220,16 +220,26 @@ def _build_login_response(user):
     tokens = get_tokens_for_user(user)
 
     from app.account.models import RoleAssignment
-    assignments = RoleAssignment.objects.filter(user=user)
-    role_assignments_data = [
-        {
-            "id": str(a.id),
-            "role": a.role,
-            "company_id": str(a.company_id) if a.company_id else None,
-            "project_id": str(a.project_id) if a.project_id else None,
-        }
-        for a in assignments
-    ]
+    if user.role in [
+        UserAccount.Role.SUPER_ADMIN,
+        UserAccount.Role.ADMIN,
+        UserAccount.Role.PROJECT_ADMIN,
+        UserAccount.Role.MANAGING_DIRECTOR,
+    ]:
+        role_assignments_data = []
+        secondary_role = None
+    else:
+        assignments = RoleAssignment.objects.filter(user=user)
+        role_assignments_data = [
+            {
+                "id": str(a.id),
+                "role": a.role,
+                "company_id": str(a.company_id) if a.company_id else None,
+                "project_id": str(a.project_id) if a.project_id else None,
+            }
+            for a in assignments
+        ]
+        secondary_role = getattr(user, 'secondary_role', None)
 
     response_data = {
         "success": True,
@@ -237,7 +247,7 @@ def _build_login_response(user):
         "refresh_token": tokens["refresh"],
         "user": {
             "role": user.role,
-            "secondary_role": getattr(user, 'secondary_role', None),
+            "secondary_role": secondary_role,
             "email": user.email,
             "first_name": user.first_name or "",
             "last_name": user.last_name or "",
@@ -1020,6 +1030,10 @@ class UsersListView(APIView):
                 users = users.filter(company__company_name__iexact=request.user.company.company_name).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
             else:
                 users = users.filter(company=request.user.company).exclude(role__in=[UserAccount.Role.SUPER_ADMIN, UserAccount.Role.ADMIN])
+
+        role_filter = request.query_params.get("role")
+        if role_filter:
+            users = users.filter(role=role_filter)
 
         # Exclude the currently logged in user so they don't appear in their own user list
         users = users.exclude(id=request.user.id)

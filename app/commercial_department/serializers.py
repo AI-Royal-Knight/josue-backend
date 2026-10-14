@@ -59,6 +59,7 @@ class VariationSerializer(serializers.ModelSerializer):
             "comments", "total_amount",
             "approval_status", "approved_by", "approved_by_name",
             "submitted_to_client", "signed_by_client",
+            "client_name", "client_email",
             "created_by", "created_by_name",
             "lines",
             "assigned_user_ids",

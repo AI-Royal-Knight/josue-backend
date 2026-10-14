@@ -2,6 +2,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import transaction
 
 from .models import Variation, VariationLine
@@ -21,6 +22,7 @@ def check_project_access(user, project_id):
 
 class VariationListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @extend_schema(responses={200: dict})
     def get(self, request):
@@ -240,21 +242,126 @@ class VariationSubmitToClientView(APIView):
 
     @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
-        """Mark variation as submitted to client."""
+        """Mark variation as submitted to client. Only commercial department allowed."""
+        user = request.user
+        if user.role != "commercial_department" and user.role not in ["admin", "project_admin"]:
+            return Response(
+                {"error": "Only the commercial department can issue variations to clients."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
-            variation = Variation.objects.get(pk=pk)
+            variation = Variation.objects.select_related("project").get(pk=pk)
         except Variation.DoesNotExist:
             return Response({"error": "Variation not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Check project access
-        if not check_project_access(request.user, variation.project_id):
+        if not check_project_access(user, variation.project_id):
             return Response(
                 {"error": "You do not have access to this project's variations."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        client_name = request.data.get("client_name")
+        client_email = request.data.get("client_email")
+
+        if client_name:
+            variation.client_name = str(client_name).strip()
+        if client_email:
+            variation.client_email = str(client_email).strip()
+
         variation.submitted_to_client = True
         variation.save()
+
+        # Send notification email if client_email is provided
+        if variation.client_email:
+            from django.core.mail import send_mail
+            from app.account.views import get_default_from_email
+            subject = f"Variation Order {variation.vo_number} Issued - {variation.project.project_name}"
+            message = (
+                f"Dear {variation.client_name or 'Client'},\n\n"
+                f"Variation Order {variation.vo_number} for project {variation.project.project_name} has been issued for your signature.\n\n"
+                f"Description of Works:\n{variation.description_of_works}\n\n"
+                f"Total Amount: £{variation.total_amount}\n\n"
+                f"Thank you."
+            )
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    get_default_from_email(),
+                    [variation.client_email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
+
+        return Response(VariationSerializer(variation).data)
+
+
+class VariationRemindClientView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=dict, responses={200: dict})
+    def post(self, request, pk):
+        """Send email reminder to client to sign variation. Only commercial department allowed."""
+        user = request.user
+        if user.role != "commercial_department" and user.role not in ["admin", "project_admin"]:
+            return Response(
+                {"error": "Only the commercial department can send reminders to the client."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            variation = Variation.objects.select_related("project").get(pk=pk)
+        except Variation.DoesNotExist:
+            return Response({"error": "Variation not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not check_project_access(user, variation.project_id):
+            return Response(
+                {"error": "You do not have access to this project's variations."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        client_email = request.data.get("client_email") or variation.client_email
+        if not client_email or not str(client_email).strip():
+            return Response(
+                {"error": "No client email has been provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        client_name = request.data.get("client_name") or variation.client_name
+
+        variation.client_email = str(client_email).strip()
+        if client_name:
+            variation.client_name = str(client_name).strip()
+        variation.save()
+
+        # Send reminder email
+        from django.core.mail import send_mail
+        from app.account.views import get_default_from_email
+
+        subject = f"Reminder: Variation {variation.vo_number} Signature Required"
+        message = (
+            f"Dear {variation.client_name or 'Client'},\n\n"
+            f"This is a reminder regarding Variation Order {variation.vo_number} for project {variation.project.project_name}.\n\n"
+            f"Description of Works:\n{variation.description_of_works}\n\n"
+            f"Total Amount: £{variation.total_amount}\n\n"
+            f"Please review and sign this variation order at your earliest convenience.\n\n"
+            f"Thank you."
+        )
+
+        try:
+            send_mail(
+                subject,
+                message,
+                get_default_from_email(),
+                [variation.client_email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            pass
+
         return Response(VariationSerializer(variation).data)
 
 
@@ -263,7 +370,7 @@ class VariationAssignUsersView(APIView):
 
     @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
-        """Assign users to a variation."""
+        """Assign users to a variation (app users / employees only)."""
         try:
             variation = Variation.objects.get(pk=pk)
         except Variation.DoesNotExist:
@@ -280,8 +387,15 @@ class VariationAssignUsersView(APIView):
         if not isinstance(assigned_user_ids, list):
             return Response({"error": "assigned_user_ids must be a list."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Update assigned users
-        variation.assigned_users.set(assigned_user_ids)
+        # Only app users (role == 'employee') from the user's company can be assigned
+        from app.account.models import UserAccount
+        valid_users = UserAccount.objects.filter(
+            id__in=assigned_user_ids,
+            role=UserAccount.Role.EMPLOYEE,
+            company=request.user.company,
+        )
+
+        variation.assigned_users.set(valid_users)
         variation.save()
         return Response(VariationSerializer(variation).data)
 
