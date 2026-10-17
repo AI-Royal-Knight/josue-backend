@@ -14,7 +14,7 @@ class CustomJWTAuthentication(JWTAuthentication):
                 if active_role == "manager":
                     active_role = UserAccount.Role.MANAGERS
 
-                if user.role in [UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN]:
+                if user.role in [UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN, UserAccount.Role.MANAGING_DIRECTOR]:
                     has_role = True
                 elif active_role in [user.role, user.secondary_role]:
                     has_role = True

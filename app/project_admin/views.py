@@ -901,11 +901,13 @@ class ProjectApprovalConfigurationsView(APIView):
 
 
 
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from app.employee.models import RFI, RFIMessage
 from app.employee.serializers import DashboardRFISerializer, RFIMessageSerializer
 
 class DashboardRFIListView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @extend_schema(responses={200: dict})
     def get(self, request):
@@ -945,17 +947,23 @@ class DashboardRFIListView(APIView):
                 
         description = request.data.get('description', '')
         trade = request.data.get('trade', 'General')
-        document = request.FILES.get('document')
+        document = request.FILES.get('document') or request.FILES.get('attachment')
         document_url = None
         
         if document:
-            from cloudinary.uploader import upload
             try:
-                upload_data = upload(document, resource_type="auto")
+                from cloudinary.uploader import upload
+                upload_data = upload(
+                    document,
+                    resource_type="auto",
+                    folder=f"josue_rfis/{project.id}"
+                )
                 document_url = upload_data.get('secure_url')
             except Exception as e:
-                print("Cloudinary upload failed for RFI creation:", str(e))
-                pass
+                print("Cloudinary upload failed for RFI creation, saving to media storage:", str(e))
+                from django.core.files.storage import default_storage
+                file_path = default_storage.save(f"rfis/{document.name}", document)
+                document_url = request.build_absolute_uri(default_storage.url(file_path))
                 
         rfi = RFI.objects.create(
             project=project,
@@ -977,6 +985,25 @@ class RFICloseView(APIView):
             rfi = RFI.objects.get(pk=pk)
         except RFI.DoesNotExist:
             return Response({"error": "RFI not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        user = request.user
+        active_role = request.headers.get("X-Active-Role") or getattr(user, 'active_role', user.role)
+
+        is_creator = (rfi.created_by_id == user.id)
+        is_project_director = (
+            user.role == "project_director" or 
+            active_role == "project_director" or 
+            user.role in ["admin", "super_admin", "managing_director"]
+        )
+
+        if is_project_director:
+            if rfi.project.company != user.company and not user.accessible_projects.filter(id=rfi.project_id).exists():
+                return Response({"error": "Unauthorized for this project"}, status=status.HTTP_403_FORBIDDEN)
+        elif not is_creator:
+            return Response(
+                {"error": "Only the person who opened this RFI or the Project Director can close it."},
+                status=status.HTTP_403_FORBIDDEN
+            )
             
         rfi.status = 'CLOSED'
         rfi.save()
@@ -986,6 +1013,7 @@ class RFICloseView(APIView):
 
 class RFIMessageCreateView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @extend_schema(request=dict, responses={200: dict})
     def post(self, request, pk):
@@ -995,23 +1023,38 @@ class RFIMessageCreateView(APIView):
             return Response({"error": "RFI not found"}, status=status.HTTP_404_NOT_FOUND)
             
         text = request.data.get('text', '')
-        attachment = request.FILES.get('attachment')
+        attachment = request.FILES.get('attachment') or request.FILES.get('document')
+
+        author_role = (
+            request.data.get('author_role') or 
+            request.headers.get('X-Active-Role') or 
+            getattr(request.user, 'active_role', None) or 
+            request.user.role
+        )
         
         message = RFIMessage.objects.create(
             rfi=rfi,
             author=request.user,
+            author_role=author_role,
             text=text
         )
         
         if attachment:
-            from cloudinary.uploader import upload
             try:
-                upload_data = upload(attachment, resource_type="auto")
+                from cloudinary.uploader import upload
+                upload_data = upload(
+                    attachment,
+                    resource_type="auto",
+                    folder=f"josue_rfis/{rfi.project_id}"
+                )
                 message.document_url = upload_data.get('secure_url')
                 message.save()
             except Exception as e:
-                print("Cloudinary upload failed for RFI message:", str(e))
-                pass
+                print("Cloudinary upload failed for RFI message, saving to media storage:", str(e))
+                from django.core.files.storage import default_storage
+                file_path = default_storage.save(f"rfis/messages/{attachment.name}", attachment)
+                message.document_url = request.build_absolute_uri(default_storage.url(file_path))
+                message.save()
                 
         serializer = RFIMessageSerializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -1022,7 +1065,12 @@ class RFIAssignTechnicalView(APIView):
     @extend_schema(request=dict, responses={200: dict})
     def patch(self, request, pk):
         user = request.user
-        if user.role not in ["contracts_manager", "manager", "managers", "supervisor", "admin", "project_admin", "super_admin", "managing_director", "project_director"]:
+        active_role = request.headers.get("X-Active-Role") or getattr(user, 'active_role', user.role)
+        allowed_roles = [
+            "contracts_manager", "manager", "managers", "supervisor",
+            "admin", "project_admin", "super_admin", "managing_director", "project_director"
+        ]
+        if user.role not in allowed_roles and active_role not in allowed_roles:
             return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
 
         try:
@@ -1030,8 +1078,13 @@ class RFIAssignTechnicalView(APIView):
         except RFI.DoesNotExist:
             return Response({"error": "RFI not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        assigned = request.data.get("assigned_to_technical_department", False)
-        rfi.assigned_to_technical_department = bool(assigned)
+        raw_assigned = request.data.get("assigned_to_technical_department")
+        if isinstance(raw_assigned, str):
+            assigned = raw_assigned.lower() in ["true", "1", "yes"]
+        else:
+            assigned = bool(raw_assigned)
+
+        rfi.assigned_to_technical_department = assigned
         rfi.save()
 
         serializer = DashboardRFISerializer(rfi)

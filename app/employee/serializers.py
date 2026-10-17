@@ -30,7 +30,7 @@ class RFIMessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RFIMessage
-        fields = ['id', 'author_name', 'author_role', 'text', 'attachments', 'created_at']
+        fields = ['id', 'author_name', 'author_role', 'text', 'attachments', 'document_url', 'created_at']
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_author_name(self, obj):
@@ -38,12 +38,15 @@ class RFIMessageSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_author_role(self, obj):
-        return dict(UserAccount.Role.choices).get(obj.author.role, obj.author.role) if obj.author else "Unknown"
+        role = getattr(obj, 'author_role', None) or (obj.author.role if obj.author else "Unknown")
+        return dict(UserAccount.Role.choices).get(role, role.replace('_', ' ').title() if isinstance(role, str) else role)
 
-    @extend_schema_field(serializers.CharField(allow_null=True))
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_attachments(self, obj):
         if obj.document_url:
-            filename = obj.document_url.split('/')[-1]
+            import urllib.parse
+            raw = obj.document_url.split('/')[-1]
+            filename = urllib.parse.unquote(raw)
             return [{"name": filename, "url": obj.document_url}]
         return []
 
@@ -57,7 +60,7 @@ class DashboardRFISerializer(serializers.ModelSerializer):
         fields = [
             'id', 'rfi_number', 'project', 'project_name', 'description', 'trade',
             'status', 'document_url', 'created_at', 'closed_at',
-            'created_by_name', 'messages', 'assigned_to_technical_department'
+            'created_by', 'created_by_name', 'messages', 'assigned_to_technical_department'
         ]
 
     @extend_schema_field(serializers.CharField(allow_null=True))

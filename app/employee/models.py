@@ -84,6 +84,7 @@ class RFI(BaseModel):
 class RFIMessage(BaseModel):
     rfi = models.ForeignKey(RFI, on_delete=models.CASCADE, related_name='messages')
     author = models.ForeignKey(UserAccount, on_delete=models.CASCADE, related_name='rfi_messages')
+    author_role = models.CharField(max_length=50, blank=True, null=True)
     text = models.TextField()
     document_url = models.URLField(max_length=500, blank=True, null=True)
     
