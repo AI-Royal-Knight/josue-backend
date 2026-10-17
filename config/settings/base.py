@@ -296,3 +296,8 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=1, minute=0),
     },
 }
+
+# Upload Size Limits (allow up to 50 MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB (Django default is 2.5 MB)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB (Django default is 2.5 MB)
+
