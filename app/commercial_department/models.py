@@ -79,14 +79,17 @@ class Variation(BaseModel):
     def save(self, *args, **kwargs):
         if not self.vo_number:
             import re
-            existing = Variation.objects.filter(project=self.project).values_list("vo_number", flat=True)
+            proj_id = self.project_id or (self.project.id if self.project else None)
+            existing = Variation.objects.filter(project_id=proj_id).values_list("vo_number", flat=True)
             max_num = 0
             for v_no in existing:
                 if v_no:
                     m = re.search(r"(\d+)", v_no)
                     if m:
                         max_num = max(max_num, int(m.group(1)))
-            self.vo_number = f"VO-{str(max_num + 1).zfill(3)}"
+            self.vo_number = f"VO{str(max_num + 1).zfill(3)}"
+        elif "-" in self.vo_number:
+            self.vo_number = self.vo_number.replace("-", "")
         super().save(*args, **kwargs)
 
     def __str__(self):

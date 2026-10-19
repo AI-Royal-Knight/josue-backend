@@ -794,7 +794,7 @@ def seed_demo_data(reset=False):
         # -------------------------------------------------------------
         print_step("8. Seeding Variations & Monthly Applications")
         var_1, _ = Variation.objects.update_or_create(
-            vo_number="VO-001",
+            vo_number="VO001",
             defaults={
                 "project": project_shard,
                 "created_by": users_by_role[UserAccount.Role.COMMERCIAL_DEPARTMENT],
@@ -855,7 +855,7 @@ def seed_demo_data(reset=False):
         )
 
         var_2, _ = Variation.objects.update_or_create(
-            vo_number="VO-002",
+            vo_number="VO002",
             defaults={
                 "project": project_shard,
                 "created_by": users_by_role[UserAccount.Role.COMMERCIAL_DEPARTMENT],
@@ -1410,7 +1410,7 @@ def seed_demo_data(reset=False):
             (
                 users_by_role[UserAccount.Role.COMMERCIAL_DEPARTMENT],
                 "Variation Update",
-                "Variation VO-001 was approved and certified by the client for £20,000.",
+                "Variation VO001 was approved and certified by the client for £20,000.",
                 Notification.Type.INFO,
                 False,
             ),
@@ -1468,7 +1468,7 @@ def print_summary(company, projects):
     print("    -> User is currently checked into 'The Shard'. Test task completions, bucket list,")
     print("       submitting variations, proforma NR, operations (RAMS, briefings), and RFIs.")
     print(" 3. Management Approval Chain: Log in as supervisor / manager / contract.manager")
-    print("    -> Test multi-stage invoice sign-offs on INV-2026-0002 and variation VO-002.")
+    print("    -> Test multi-stage invoice sign-offs on INV-2026-0002 and variation VO002.")
     print(" 4. Commercial Department: Log in as commercial.department@gmail.com")
     print("    -> Test monthly application #3, client claim valuations, and White Card view.")
     print(" 5. Procurement & Supplier Portal: Log in as procurement@gmail.com or supplier@gmail.com")

@@ -109,7 +109,7 @@ class AttendanceStatusView(APIView):
                     m = _re.search(r"(\d+)", v_no)
                     if m:
                         max_vo_num = max(max_vo_num, int(m.group(1)))
-            next_variation_no = f"VO-{str(max_vo_num + 1).zfill(3)}"
+            next_variation_no = f"VO{str(max_vo_num + 1).zfill(3)}"
 
             return Response({
                 "status": "checked_in",
