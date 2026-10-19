@@ -1,3 +1,4 @@
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from app.account.models import CompanySupplier, SupplierProfile, UserAccount
@@ -110,7 +111,7 @@ class CallOffLineItemSerializer(serializers.ModelSerializer):
     main_folder_name = serializers.CharField(source='quotation.main_folder.name', read_only=True)
     sub_folder_name = serializers.CharField(source='quotation.sub_folder.name', read_only=True)
     variation_ref = serializers.CharField(source='quotation.variation_ref', read_only=True)
-    supplier_name = serializers.CharField(source='quotation.supplier.supplier.company_name', read_only=True)
+    supplier_name = serializers.SerializerMethodField()
     supplier_email = serializers.CharField(source='quotation.supplier_email', read_only=True)
 
     class Meta:
@@ -124,16 +125,27 @@ class CallOffLineItemSerializer(serializers.ModelSerializer):
         )
 
     @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_supplier_name(self, obj):
+        q = obj.quotation
+        if q:
+            if q.supplier and q.supplier.supplier:
+                return q.supplier.supplier.company_name
+            return q.supplier_name or q.supplier_email or "Supplier"
+        return "Supplier"
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_qty_remaining(self, obj):
         called_off_qty = sum(c.qty for c in obj.call_offs.all())
         return obj.qty - called_off_qty
 
 
 class QuotationSerializer(serializers.ModelSerializer):
+    supplier = serializers.PrimaryKeyRelatedField(queryset=CompanySupplier.objects.all(), required=False, allow_null=True)
+    supplier_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    date_of_quote = serializers.DateField(required=False, default=timezone.localdate)
     line_items = QuotationLineItemSerializer(many=True, required=False)
     history = QuotationHistorySerializer(many=True, read_only=True)
     project_name = serializers.CharField(source='project.project_name', read_only=True)
-    supplier_name = serializers.CharField(source='supplier.supplier.company_name', read_only=True)
     main_folder_name = serializers.CharField(source='main_folder.name', read_only=True)
     sub_folder_name = serializers.CharField(source='sub_folder.name', read_only=True)
     
@@ -145,8 +157,7 @@ class QuotationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         line_items_data = validated_data.pop('line_items', [])
         if validated_data.get('po_created') and not validated_data.get('date_po_created'):
-            from django.utils import timezone
-            validated_data['date_po_created'] = timezone.now().date()
+            validated_data['date_po_created'] = timezone.localdate()
         quotation = Quotation.objects.create(**validated_data)
         for item_data in line_items_data:
             QuotationLineItem.objects.create(quotation=quotation, **item_data)
@@ -155,11 +166,19 @@ class QuotationSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         # Fallback to the supplier's registered account email if none was provided
-        if not ret.get('supplier_email'):
+        if not ret.get('supplier_email') and instance.supplier and instance.supplier.supplier:
             try:
                 ret['supplier_email'] = instance.supplier.supplier.user.email
             except AttributeError:
                 pass
+        # Determine supplier_name to display
+        if instance.supplier and instance.supplier.supplier and instance.supplier.supplier.company_name:
+            ret['supplier_name'] = instance.supplier.supplier.company_name
+        elif not ret.get('supplier_name'):
+            if instance.supplier_email:
+                ret['supplier_name'] = instance.supplier_email.split(',')[0].strip()
+            else:
+                ret['supplier_name'] = "Unregistered Supplier"
         return ret
 
 # Nested Serializers for Project -> Folders -> Subfolders

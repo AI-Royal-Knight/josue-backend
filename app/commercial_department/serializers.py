@@ -69,6 +69,13 @@ class VariationSerializer(serializers.ModelSerializer):
             "clientCertifiedAmount", "diffrenceAmount", "paymentStatusNr", "claimGQComment",
             "valuation_amount", "percent_claimed", "amount_claimed", "client_certified_amount",
             "corresponding_notice_no", "client_qs_comment", "difference",
+            "supervisor_approved", "supervisor_approved_date",
+            "manager_approved", "manager_approved_date",
+            "contracts_manager_approved", "contracts_manager_approved_date",
+            "project_director_approved", "project_director_approved_date",
+            "managing_director_approved", "managing_director_approved_date",
+            "commercial_department_approved", "commercial_department_approved_date",
+            "fully_approved",
         ]
 
     @extend_schema_field(serializers.CharField(allow_null=True))

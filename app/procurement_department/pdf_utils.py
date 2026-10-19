@@ -420,7 +420,11 @@ def generate_quotation_pdf(quotation, logo_path=None) -> bytes:
     elements.append(Paragraph("REQUEST FOR QUOTATION", title_style))
     
     project_name = quotation.project.project_name if quotation.project else "N/A"
-    company_name = quotation.supplier.supplier.company_name if quotation.supplier and quotation.supplier.supplier else "N/A"
+    company_name = (
+        quotation.supplier.supplier.company_name
+        if quotation.supplier and quotation.supplier.supplier
+        else (getattr(quotation, 'supplier_name', None) or quotation.supplier_email or "N/A")
+    )
     
     # Metadata Table
     meta_data = [
@@ -538,10 +542,15 @@ def generate_branded_call_off_pdf(call_off_obj, logo_path=None) -> bytes:
     line_item = call_off_obj.line_item
     quotation = line_item.quotation
     
+    supplier_name = (
+        quotation.supplier.supplier.company_name
+        if quotation.supplier and quotation.supplier.supplier
+        else (getattr(quotation, 'supplier_name', None) or quotation.supplier_email or "N/A")
+    )
     meta_data = [
         ["Call Off Ref:", call_off_obj.call_off_ref, "PO Ref:", quotation.quote_ref],
         ["Project:", quotation.project.project_name, "Date:", call_off_obj.date.strftime('%Y-%m-%d')],
-        ["Supplier:", quotation.supplier.supplier.company_name, "Expected Delivery:", call_off_obj.expected_delivery_date.strftime('%Y-%m-%d') if call_off_obj.expected_delivery_date else "N/A"]
+        ["Supplier:", supplier_name, "Expected Delivery:", call_off_obj.expected_delivery_date.strftime('%Y-%m-%d') if call_off_obj.expected_delivery_date else "N/A"]
     ]
 
     meta_table = Table(meta_data, colWidths=[30*mm, 55*mm, 30*mm, 55*mm])
@@ -655,9 +664,14 @@ def generate_combined_call_off_pdf(call_offs, logo_path=None):
     line_item = first_co.line_item
     quotation = line_item.quotation
     
+    supplier_name = (
+        quotation.supplier.supplier.company_name
+        if quotation.supplier and quotation.supplier.supplier
+        else (getattr(quotation, 'supplier_name', None) or quotation.supplier_email or "N/A")
+    )
     meta_data = [
         ["PO Ref:", quotation.quote_ref, "Project:", quotation.project.project_name],
-        ["Supplier:", quotation.supplier.supplier.company_name, "Date:", timezone.now().strftime('%Y-%m-%d')],
+        ["Supplier:", supplier_name, "Date:", timezone.now().strftime('%Y-%m-%d')],
     ]
 
     meta_table = Table(meta_data, colWidths=[30*mm, 55*mm, 30*mm, 55*mm])

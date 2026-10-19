@@ -345,41 +345,49 @@ class QuotationViewSet(viewsets.ModelViewSet):
     queryset = Quotation.objects.none()
 
     def get_queryset(self):
-        if self.request.user.role == UserAccount.Role.ADMIN:
-            return Quotation.objects.filter(project__company=self.request.user.company)
+        user = self.request.user
+        qs = Quotation.objects.none()
 
-        # Allow suppliers to see their quotations
-        from app.account.models import SupplierProfile
-        is_supplier = (
-            self.request.user.role == UserAccount.Role.SUPPLIER
-            or SupplierProfile.objects.filter(user=self.request.user).exists()
-            or RoleAssignment.objects.filter(user=self.request.user, role=UserAccount.Role.SUPPLIER).exists()
-        )
-        if is_supplier:
-            from django.db.models import Q
-            company_id = self.request.headers.get("X-Company-ID") or self.request.query_params.get("company_id")
-            qs = Quotation.objects.filter(
-                Q(supplier__supplier__user=self.request.user) |
-                Q(supplier_email__icontains=self.request.user.email)
+        if user.role == UserAccount.Role.ADMIN:
+            qs = Quotation.objects.filter(project__company=user.company)
+        elif user.role == UserAccount.Role.SUPER_ADMIN:
+            qs = Quotation.objects.all()
+        else:
+            # Allow suppliers to see their quotations
+            from app.account.models import SupplierProfile
+            is_supplier = (
+                user.role == UserAccount.Role.SUPPLIER
+                or SupplierProfile.objects.filter(user=user).exists()
+                or RoleAssignment.objects.filter(user=user, role=UserAccount.Role.SUPPLIER).exists()
             )
-            if company_id:
-                qs = qs.filter(Q(project__company_id=company_id) | Q(supplier__company_id=company_id))
-            return qs.distinct().order_by("-created_at")
+            if is_supplier:
+                from django.db.models import Q
+                company_id = self.request.headers.get("X-Company-ID") or self.request.query_params.get("company_id")
+                qs = Quotation.objects.filter(
+                    Q(supplier__supplier__user=user) |
+                    Q(supplier_email__icontains=user.email)
+                )
+                if company_id:
+                    qs = qs.filter(Q(project__company_id=company_id) | Q(supplier__company_id=company_id))
+            else:
+                # Company staff (Contracts Manager, Procurement Dept, Commercial Dept, etc.)
+                role_assignment = RoleAssignment.objects.filter(
+                    user=user, 
+                    role=UserAccount.Role.PROCUREMENT_DEPARTMENT
+                ).first()
+                company = (role_assignment.company if role_assignment else None) or user.company
+                if company:
+                    qs = Quotation.objects.filter(project__company=company)
+                assigned_qs = Quotation.objects.filter(project__in=user.accessible_projects)
+                qs = (qs | assigned_qs).distinct()
 
-        # Allow Procurement dept to see all company quotations
-        role_assignment = RoleAssignment.objects.filter(
-            user=self.request.user, 
-            role=UserAccount.Role.PROCUREMENT_DEPARTMENT
-        ).first()
-        
-        queryset = Quotation.objects.none()
-        if role_assignment and role_assignment.company:
-            queryset = Quotation.objects.filter(project__company=role_assignment.company)
-            
-        # Always include quotations for projects this user is explicitly assigned to
-        assigned_qs = Quotation.objects.filter(project__in=self.request.user.accessible_projects)
-        
-        return (queryset | assigned_qs).distinct()
+        # Filter by project if provided in query params
+        params = getattr(self.request, 'query_params', getattr(self.request, 'GET', {}))
+        project_param = params.get('project') or params.get('project_id')
+        if project_param and project_param != 'undefined' and project_param != 'null':
+            qs = qs.filter(project_id=project_param)
+
+        return qs.order_by("-created_at")
 
     @action(detail=True, methods=['patch'])
     def approve(self, request, pk=None):
@@ -538,14 +546,16 @@ class QuotationViewSet(viewsets.ModelViewSet):
                     f"Thank you."
                 )
                 
-                email = EmailMessage(
-                    subject,
-                    message,
-                    get_default_from_email(),
-                    [email_to]
-                )
-                email.attach(f"Quotation_{quotation.quote_ref}.pdf", pdf_bytes, "application/pdf")
-                email.send(fail_silently=True)
+                recipients = [e.strip() for e in email_to.split(",") if e.strip()]
+                if recipients:
+                    email = EmailMessage(
+                        subject,
+                        message,
+                        get_default_from_email(),
+                        recipients
+                    )
+                    email.attach(f"Quotation_{quotation.quote_ref}.pdf", pdf_bytes, "application/pdf")
+                    email.send(fail_silently=True)
                 
         except Exception as e:
             print(f"Error sending quotation email: {e}")
@@ -553,39 +563,57 @@ class QuotationViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
         
-        # Auto-create or resolve supplier if we receive raw names instead of ID
-        if 'supplier' not in data and 'supplier_name' in data:
-            supplier_name = data.get('supplier_name')
-            supplier_email = data.get('supplier_email') or f"temp_supplier_{supplier_name.replace(' ', '_').lower()}@example.com"
-            
-            # Find user's company
+        supplier_id = data.get('supplier')
+        supplier_name = data.get('supplier_name')
+        supplier_email = data.get('supplier_email')
+        
+        # If supplier is not provided or empty string
+        if not supplier_id:
+            data['supplier'] = None
+            if not supplier_name and supplier_email:
+                first_email = supplier_email.split(',')[0].strip()
+                supplier_name = first_email.split('@')[0].replace('.', ' ').replace('_', ' ').title()
+                data['supplier_name'] = supplier_name
+            elif supplier_name:
+                data['supplier_name'] = supplier_name
+
+            # If we have email and/or name, try to auto-associate with CompanySupplier if possible
             company = None
-            if request.user.role == UserAccount.Role.ADMIN:
-                company = request.user.company
-            else:
-                from app.account.models import RoleAssignment
-                role_assignment = RoleAssignment.objects.filter(user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT).first()
-                if role_assignment:
-                    company = role_assignment.company
-                    
-            if company:
-                user, _ = UserAccount.objects.get_or_create(
-                    email=supplier_email,
-                    defaults={'role': UserAccount.Role.SUPPLIER, 'is_active': True}
-                )
-                from app.account.models import SupplierProfile, CompanySupplier
-                supplier_profile, _ = SupplierProfile.objects.get_or_create(
-                    user=user,
-                    defaults={'company_name': supplier_name}
-                )
-                company_supplier, _ = CompanySupplier.objects.get_or_create(
-                    company=company,
-                    supplier=supplier_profile,
-                    defaults={'eom_payment_terms': 30, 'credit_limit': 0.00}
-                )
-                data['supplier'] = company_supplier.id
-                
-        # We need to temporarily set the modified data for the serializer
+            project_id = data.get('project')
+            if project_id:
+                proj = Project.objects.filter(id=project_id).first()
+                if proj:
+                    company = proj.company
+            if not company:
+                if request.user.role == UserAccount.Role.ADMIN:
+                    company = request.user.company
+                else:
+                    role_assignment = RoleAssignment.objects.filter(user=request.user, role=UserAccount.Role.PROCUREMENT_DEPARTMENT).first()
+                    company = (role_assignment.company if role_assignment else None) or request.user.company
+
+            if company and supplier_email:
+                first_email = supplier_email.split(',')[0].strip()
+                try:
+                    user, _ = UserAccount.objects.get_or_create(
+                        email=first_email,
+                        defaults={'role': UserAccount.Role.SUPPLIER, 'is_active': True}
+                    )
+                    from app.account.models import SupplierProfile, CompanySupplier
+                    supplier_profile, _ = SupplierProfile.objects.get_or_create(
+                        user=user,
+                        defaults={'company_name': supplier_name or first_email}
+                    )
+                    company_supplier, _ = CompanySupplier.objects.get_or_create(
+                        company=company,
+                        supplier=supplier_profile,
+                        defaults={'eom_payment_terms': 30, 'credit_limit': 0.00}
+                    )
+                    data['supplier'] = company_supplier.id
+                except Exception as e:
+                    print(f"Notice: CompanySupplier auto-create skipped: {e}")
+                    data['supplier'] = None
+
+        # Set modified data for serializer
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -814,27 +842,40 @@ class CallOffListViewSet(viewsets.GenericViewSet, viewsets.mixins.ListModelMixin
 
     def get_queryset(self):
         from .models import QuotationLineItem
+        user = self.request.user
         
         # Base filter: Quotation must be approved
         queryset = QuotationLineItem.objects.filter(quotation__status='Approved')
         
-        if self.request.user.role == UserAccount.Role.ADMIN:
-            return queryset.filter(quotation__project__company=self.request.user.company)
-
-        # Allow Procurement dept to see all company call-offs
-        role_assignment = RoleAssignment.objects.filter(
-            user=self.request.user, 
-            role=UserAccount.Role.PROCUREMENT_DEPARTMENT
-        ).first()
-        
-        user_qs = QuotationLineItem.objects.none()
-        if role_assignment and role_assignment.company:
-            user_qs = queryset.filter(quotation__project__company=role_assignment.company)
+        if user.role == UserAccount.Role.ADMIN:
+            qs = queryset.filter(quotation__project__company=user.company)
+        elif user.role == UserAccount.Role.SUPER_ADMIN:
+            qs = queryset
+        else:
+            role_assignment = RoleAssignment.objects.filter(
+                user=user, 
+                role=UserAccount.Role.PROCUREMENT_DEPARTMENT
+            ).first()
+            company = (role_assignment.company if role_assignment else None) or user.company
             
-        # Include those assigned to user
-        assigned_qs = queryset.filter(quotation__project__in=self.request.user.accessible_projects)
-        
-        return (user_qs | assigned_qs).distinct().select_related(
+            user_qs = QuotationLineItem.objects.none()
+            if company:
+                user_qs = queryset.filter(quotation__project__company=company)
+                
+            # Include those assigned to user
+            assigned_qs = queryset.filter(quotation__project__in=user.accessible_projects)
+            qs = (user_qs | assigned_qs).distinct()
+            
+            if company:
+                qs = qs.filter(quotation__project__company=company)
+
+        # Filter by project query param
+        params = getattr(self.request, 'query_params', getattr(self.request, 'GET', {}))
+        project_param = params.get('project') or params.get('project_id')
+        if project_param and project_param != 'undefined' and project_param != 'null':
+            qs = qs.filter(quotation__project_id=project_param)
+
+        return qs.select_related(
             'quotation', 'quotation__project', 'quotation__main_folder', 
             'quotation__sub_folder', 'quotation__supplier__supplier'
         ).prefetch_related('call_offs', 'call_offs__called_off_by', 'call_offs__approved_by')

@@ -124,9 +124,13 @@ class VariationListCreateView(APIView):
                     resource_type='auto',
                     folder=f"josue_variations/{project_id}"
                 )
-                evidence_url = upload_result.get('secure_url')
+                evidence_url = upload_result.get('secure_url', '')
             except Exception as e:
-                return Response({"error": f"Failed to upload evidence: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+                print("Cloudinary upload failed for variation evidence, saving to media storage:", str(e))
+                from django.core.files.storage import default_storage
+                from django.conf import settings
+                file_name = default_storage.save(f"variations/{project_id}/{evidence_file.name}", evidence_file)
+                evidence_url = request.build_absolute_uri(settings.MEDIA_URL + file_name)
 
         with transaction.atomic():
             variation = Variation.objects.create(
@@ -387,12 +391,20 @@ class VariationAssignUsersView(APIView):
         if not isinstance(assigned_user_ids, list):
             return Response({"error": "assigned_user_ids must be a list."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Only app users (role == 'employee') from the user's company can be assigned
+        # Assigning app users requires the variation to be approved by the Commercial Manager
+        if variation.approval_status != Variation.ApprovalStatus.APPROVED and not variation.commercial_department_approved:
+            return Response(
+                {"error": "App users can only be assigned once the variation has been approved by the Commercial Manager."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Only app users (role == 'employee') from the user's company who have been approved by the document controller can be assigned
         from app.account.models import UserAccount
         valid_users = UserAccount.objects.filter(
             id__in=assigned_user_ids,
             role=UserAccount.Role.EMPLOYEE,
             company=request.user.company,
+            profile__is_approved=True,
         )
 
         variation.assigned_users.set(valid_users)
@@ -418,43 +430,56 @@ class MonthlyApplicationListCreateView(APIView):
         apps = MonthlyApplication.objects.filter(project_id=project_id)
         serializer = MonthlyApplicationSerializer(apps, many=True)
 
-        # Calculate current draft based on approved invoices and variations
-        from app.project_admin.models import UserInvoice, ProjectSubfolder, Project
-        import uuid
+        # Calculate current draft based on actual booked app user labour targets and approved variations
+        from app.project_admin.models import UserInvoice, ProjectSubfolder, Project, FolderAssignment
         
-        approved_invoices = UserInvoice.objects.filter(
-            project_id=project_id, 
-            source_type=UserInvoice.SourceType.LABOUR_TARGET
+        assignments = FolderAssignment.objects.filter(
+            subfolder__folder__project_id=project_id
+        ).select_related('subfolder')
+        assignment_map = {str(a.id): a.subfolder for a in assignments}
+        
+        invoices = UserInvoice.objects.filter(
+            project_id=project_id,
+            source_type=UserInvoice.SourceType.LABOUR_TARGET,
+            status=UserInvoice.Status.SUBMITTED
         )
-        approved_assignment_ids = []
-        for inv in approved_invoices:
-            if inv.fully_approved and inv.source_id:
+        
+        contract_works_total = 0.0
+        for inv in invoices:
+            sid = inv.source_id or ""
+            parts = sid.split(":")
+            aid = parts[0]
+            subfolder = assignment_map.get(aid)
+            if not subfolder:
+                continue
+            rows = subfolder.rows or []
+            if len(parts) == 2:
                 try:
-                    uuid.UUID(inv.source_id)
-                    approved_assignment_ids.append(inv.source_id)
-                except ValueError:
+                    row_idx = int(parts[1])
+                    if 0 <= row_idx < len(rows):
+                        row = rows[row_idx]
+                        row_pv = float(row.get('projectValue', 0) or 0)
+                        row_lt = float(row.get('labourTarget', 0) or 0)
+                        booked_val = float(inv.total or 0)
+                        if row_lt > 0:
+                            contract_works_total += (booked_val / row_lt) * row_pv
+                        else:
+                            contract_works_total += booked_val
+                except (ValueError, TypeError):
                     pass
-
-        import datetime
-        now = datetime.datetime.now()
-        current_month_subfolders = ProjectSubfolder.objects.filter(
-            folder__project_id=project_id,
-            created_at__year=now.year,
-            created_at__month=now.month
-        )
-        contract_works_total = 0
-        for sub in current_month_subfolders:
-            for row in (sub.rows or []):
-                try:
-                    val = str(row.get('projectValue', '0')).strip()
-                    if val:
-                        contract_works_total += float(val)
-                except ValueError:
-                    pass
+            else:
+                sub_pv = float(subfolder.project_value or 0)
+                sub_lt = float(subfolder.labour_target or 0) if hasattr(subfolder, 'labour_target') else 0
+                booked_val = float(inv.total or 0)
+                if sub_lt > 0:
+                    contract_works_total += (booked_val / sub_lt) * sub_pv
+                else:
+                    contract_works_total += booked_val
 
         approved_variations = Variation.objects.filter(
             project_id=project_id, 
-            approval_status=Variation.ApprovalStatus.APPROVED
+            approval_status=Variation.ApprovalStatus.APPROVED,
+            submitted_to_client=True
         )
         variations_total = sum(float(v.amount_claimed) if v.amount_claimed else float(v.total_amount) for v in approved_variations)
 
@@ -484,42 +509,55 @@ class MonthlyApplicationListCreateView(APIView):
             return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
 
         # Basic financial snapshot calculations
-        from app.project_admin.models import UserInvoice, ProjectSubfolder
-        import uuid
-        
-        approved_invoices = UserInvoice.objects.filter(
-            project_id=project_id, 
-            source_type=UserInvoice.SourceType.LABOUR_TARGET
-        )
-        approved_assignment_ids = []
-        for inv in approved_invoices:
-            if inv.fully_approved and inv.source_id:
-                try:
-                    uuid.UUID(inv.source_id)
-                    approved_assignment_ids.append(inv.source_id)
-                except ValueError:
-                    pass
-
+        from app.project_admin.models import UserInvoice, ProjectSubfolder, FolderAssignment
         import datetime
-        now = datetime.datetime.now()
-        current_month_subfolders = ProjectSubfolder.objects.filter(
-            folder__project_id=project_id,
-            created_at__year=now.year,
-            created_at__month=now.month
+        
+        assignments = FolderAssignment.objects.filter(
+            subfolder__folder__project_id=project_id
+        ).select_related('subfolder')
+        assignment_map = {str(a.id): a.subfolder for a in assignments}
+        
+        invoices = UserInvoice.objects.filter(
+            project_id=project_id,
+            source_type=UserInvoice.SourceType.LABOUR_TARGET,
+            status=UserInvoice.Status.SUBMITTED
         )
-        contract_works_total = 0
-        for sub in current_month_subfolders:
-            for row in (sub.rows or []):
+        contract_works_total = 0.0
+        for inv in invoices:
+            sid = inv.source_id or ""
+            parts = sid.split(":")
+            aid = parts[0]
+            subfolder = assignment_map.get(aid)
+            if not subfolder:
+                continue
+            rows = subfolder.rows or []
+            if len(parts) == 2:
                 try:
-                    val = str(row.get('projectValue', '0')).strip()
-                    if val:
-                        contract_works_total += float(val)
-                except ValueError:
+                    row_idx = int(parts[1])
+                    if 0 <= row_idx < len(rows):
+                        row = rows[row_idx]
+                        row_pv = float(row.get('projectValue', 0) or 0)
+                        row_lt = float(row.get('labourTarget', 0) or 0)
+                        booked_val = float(inv.total or 0)
+                        if row_lt > 0:
+                            contract_works_total += (booked_val / row_lt) * row_pv
+                        else:
+                            contract_works_total += booked_val
+                except (ValueError, TypeError):
                     pass
+            else:
+                sub_pv = float(subfolder.project_value or 0)
+                sub_lt = float(subfolder.labour_target or 0) if hasattr(subfolder, 'labour_target') else 0
+                booked_val = float(inv.total or 0)
+                if sub_lt > 0:
+                    contract_works_total += (booked_val / sub_lt) * sub_pv
+                else:
+                    contract_works_total += booked_val
         
         approved_variations = Variation.objects.filter(
             project_id=project_id, 
-            approval_status=Variation.ApprovalStatus.APPROVED
+            approval_status=Variation.ApprovalStatus.APPROVED,
+            submitted_to_client=True
         )
         variations_total = sum(float(v.amount_claimed) if v.amount_claimed else float(v.total_amount) for v in approved_variations)
         
@@ -544,7 +582,8 @@ class WhiteCardView(APIView):
 
     @extend_schema(responses={200: dict})
     def get(self, request):
-        project_id = request.query_params.get("project_id")
+        params = getattr(request, 'query_params', getattr(request, 'GET', {}))
+        project_id = params.get("project_id")
         if not project_id:
             return Response({"error": "project_id is required."}, status=status.HTTP_400_BAD_REQUEST)
         if not check_project_access(request.user, project_id):
@@ -552,20 +591,60 @@ class WhiteCardView(APIView):
 
         folders = ProjectFolder.objects.filter(project_id=project_id).prefetch_related("subfolders")
         
+        from app.project_admin.models import FolderAssignment, UserInvoice
+        assignments = FolderAssignment.objects.filter(
+            subfolder__folder__project_id=project_id
+        ).values('id', 'subfolder_id')
+        
+        subfolder_to_aids = {}
+        for a in assignments:
+            subfolder_to_aids.setdefault(str(a['subfolder_id']), []).append(str(a['id']))
+            
+        invoices = UserInvoice.objects.filter(
+            project_id=project_id,
+            source_type=UserInvoice.SourceType.LABOUR_TARGET,
+            status=UserInvoice.Status.SUBMITTED
+        ).values('source_id', 'total')
+        
+        booked_by_source = {}
+        for inv in invoices:
+            sid = inv['source_id']
+            booked_by_source[sid] = booked_by_source.get(sid, 0.0) + float(inv['total'] or 0.0)
+
         groups = []
         for folder in folders:
+            subfolders_data = []
+            for sub in folder.subfolders.all():
+                sub_id_str = str(sub.id)
+                aids = subfolder_to_aids.get(sub_id_str, [])
+                rows = sub.rows if isinstance(sub.rows, list) else []
+                
+                enhanced_rows = []
+                for i, r in enumerate(rows):
+                    r_copy = dict(r) if isinstance(r, dict) else {}
+                    row_booked = 0.0
+                    for aid in aids:
+                        row_booked += booked_by_source.get(f"{aid}:{i}", 0.0)
+                    r_copy['bookedLabour'] = row_booked
+                    enhanced_rows.append(r_copy)
+                
+                sub_booked = 0.0
+                for aid in aids:
+                    sub_booked += booked_by_source.get(aid, 0.0)
+                    
+                subfolders_data.append({
+                    "id": sub_id_str,
+                    "name": sub.name,
+                    "project_value": float(sub.project_value),
+                    "labour_target": float(sub.labour_target) if hasattr(sub, 'labour_target') else 0.0,
+                    "booked_labour": sub_booked,
+                    "rows": enhanced_rows
+                })
+                
             groups.append({
                 "groupId": str(folder.id),
                 "headerName": folder.name,
-                "subfolders": [
-                    {
-                        "id": str(sub.id),
-                        "name": sub.name,
-                        "project_value": float(sub.project_value),
-                        "labour_target": float(sub.labour_target) if hasattr(sub, 'labour_target') else 0.0,
-                        "rows": sub.rows if isinstance(sub.rows, list) else []
-                    } for sub in folder.subfolders.all()
-                ]
+                "subfolders": subfolders_data
             })
 
         return Response({"groups": groups})

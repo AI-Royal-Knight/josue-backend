@@ -233,16 +233,61 @@ class ProjectFinancialBreakdownView(APIView):
             prof_nr_mat = 0 # No material estimate on UserInvoice
             
             # Bookings
-            project_value_booked = ProjectValueBooking.objects.filter(project=project, date__lte=current_end, date__gte=current_start, is_approved=True).aggregate(t=Sum('amount'))['t'] or 0
-            labour_target = LabourBooking.objects.filter(project=project, date__lte=current_end, date__gte=current_start, is_approved=True).aggregate(t=Sum('amount'))['t'] or 0
             plant_hire = PlantHireBooking.objects.filter(project=project, date__lte=current_end, date__gte=current_start, is_approved=True).aggregate(t=Sum('amount'))['t'] or 0
             loading_clearing = LoadingClearingBooking.objects.filter(project=project, date__lte=current_end, date__gte=current_start, is_approved=True).aggregate(t=Sum('amount'))['t'] or 0
             management_prelims = ManagementPrelimBooking.objects.filter(project=project, date__lte=current_end, date__gte=current_start, is_approved=True).aggregate(t=Sum('amount'))['t'] or 0
             
-            # Derived fields
-            # Use the project's actual value directly (not a booking aggregate)
-            project_value = float(project.project_value or 0)
-            application_value = project_value + var_claim
+            # Labour target expenditure booked off by mobile app users
+            lt_invoices = UserInvoice.objects.filter(
+                project=project,
+                source_type=UserInvoice.SourceType.LABOUR_TARGET,
+                status=UserInvoice.Status.SUBMITTED,
+                date__lte=current_end,
+                date__gte=current_start
+            )
+            labour_target = float(lt_invoices.aggregate(t=Sum('total'))['t'] or 0.0)
+
+            # Calculate project value booked via labour target connection
+            from app.project_admin.models import FolderAssignment
+            period_assignments = FolderAssignment.objects.filter(
+                subfolder__folder__project=project
+            ).select_related('subfolder')
+            assignment_map = {str(a.id): a.subfolder for a in period_assignments}
+
+            booked_project_value = 0.0
+            for inv in lt_invoices:
+                sid = inv.source_id or ""
+                parts = sid.split(":")
+                aid = parts[0]
+                subfolder = assignment_map.get(aid)
+                if not subfolder:
+                    continue
+                rows = subfolder.rows or []
+                if len(parts) == 2:
+                    try:
+                        row_idx = int(parts[1])
+                        if 0 <= row_idx < len(rows):
+                            row = rows[row_idx]
+                            row_pv = float(row.get('projectValue', 0) or 0)
+                            row_lt = float(row.get('labourTarget', 0) or 0)
+                            inv_amt = float(inv.total or 0)
+                            if row_lt > 0:
+                                booked_project_value += (inv_amt / row_lt) * row_pv
+                            else:
+                                booked_project_value += inv_amt
+                    except (ValueError, TypeError):
+                        pass
+                else:
+                    sub_pv = float(subfolder.project_value or 0)
+                    sub_lt = float(subfolder.labour_target or 0) if hasattr(subfolder, 'labour_target') else 0
+                    inv_amt = float(inv.total or 0)
+                    if sub_lt > 0:
+                        booked_project_value += (inv_amt / sub_lt) * sub_pv
+                    else:
+                        booked_project_value += inv_amt
+
+            application_value = booked_project_value + var_claim
+            project_value = application_value
             
             # Unclaimed Logic and Overspend — both share the same two inputs:
             #   labour_target = SUM(subfolder row labourTarget values)

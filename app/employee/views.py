@@ -101,7 +101,15 @@ class AttendanceStatusView(APIView):
                 is_active=True
             ).exists()
 
-            next_variation_no = f"VO-{str(Variation.objects.count() + 1).zfill(3)}"
+            import re as _re
+            existing_vos = Variation.objects.filter(project=active_log.project).values_list("vo_number", flat=True)
+            max_vo_num = 0
+            for v_no in existing_vos:
+                if v_no:
+                    m = _re.search(r"(\d+)", v_no)
+                    if m:
+                        max_vo_num = max(max_vo_num, int(m.group(1)))
+            next_variation_no = f"VO-{str(max_vo_num + 1).zfill(3)}"
 
             return Response({
                 "status": "checked_in",

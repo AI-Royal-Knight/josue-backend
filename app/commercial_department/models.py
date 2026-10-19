@@ -18,7 +18,7 @@ class Variation(BaseModel):
         UserAccount, on_delete=models.SET_NULL, null=True, related_name="created_variations"
     )
 
-    vo_number = models.CharField(max_length=20, unique=True, blank=True)
+    vo_number = models.CharField(max_length=20, blank=True)
     variation_sheet_number = models.CharField(max_length=10, blank=True, default="")
     site_instruction_no = models.CharField(max_length=100, blank=True, default="")
     attention_of = models.CharField(max_length=200, blank=True, default="")
@@ -74,12 +74,19 @@ class Variation(BaseModel):
     class Meta:
         db_table = "variations"
         ordering = ["-date", "-created_at"]
+        unique_together = [("project", "vo_number")]
 
     def save(self, *args, **kwargs):
         if not self.vo_number:
-            # Auto-generate VO number based on count
-            count = Variation.objects.count() + 1
-            self.vo_number = f"VO-{str(count).zfill(3)}"
+            import re
+            existing = Variation.objects.filter(project=self.project).values_list("vo_number", flat=True)
+            max_num = 0
+            for v_no in existing:
+                if v_no:
+                    m = re.search(r"(\d+)", v_no)
+                    if m:
+                        max_num = max(max_num, int(m.group(1)))
+            self.vo_number = f"VO-{str(max_num + 1).zfill(3)}"
         super().save(*args, **kwargs)
 
     def __str__(self):

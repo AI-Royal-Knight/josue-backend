@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from core.models import BaseModel
 from app.project_admin.models import Project, ProjectFolder, ProjectSubfolder
 from app.account.models import CompanySupplier, UserAccount
@@ -40,10 +41,11 @@ class Quotation(BaseModel):
     sub_folder = models.ForeignKey(ProjectSubfolder, on_delete=models.SET_NULL, null=True, blank=True)
     variation_ref = models.CharField(max_length=100, null=True, blank=True)
     
-    supplier = models.ForeignKey(CompanySupplier, on_delete=models.CASCADE, related_name="quotations")
+    supplier = models.ForeignKey(CompanySupplier, on_delete=models.SET_NULL, null=True, blank=True, related_name="quotations")
+    supplier_name = models.CharField(max_length=255, blank=True, null=True)
     supplier_email = models.CharField(max_length=255, blank=True, null=True)
     
-    date_of_quote = models.DateField(auto_now_add=True)
+    date_of_quote = models.DateField(default=timezone.localdate)
     quote_total = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
