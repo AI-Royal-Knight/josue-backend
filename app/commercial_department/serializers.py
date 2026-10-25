@@ -23,11 +23,7 @@ class VariationSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source="project.project_name", read_only=True)
     created_by_name = serializers.SerializerMethodField()
     approved_by_name = serializers.SerializerMethodField()
-    assigned_user_ids = serializers.PrimaryKeyRelatedField(
-        source="assigned_users",
-        many=True,
-        read_only=True
-    )
+    assigned_user_ids = serializers.SerializerMethodField()
     
     # Custom fields for Variation Summary UI
     no = serializers.CharField(source="vo_number", read_only=True)
@@ -89,6 +85,19 @@ class VariationSerializer(serializers.ModelSerializer):
         if obj.approved_by:
             return obj.approved_by.full_name
         return ""
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_assigned_user_ids(self, obj):
+        if obj.approval_status != Variation.ApprovalStatus.APPROVED and not obj.commercial_department_approved:
+            return []
+        from app.account.models import UserAccount
+        return [
+            str(u.id) for u in obj.assigned_users.filter(
+                role=UserAccount.Role.EMPLOYEE,
+                profile__is_approved=True,
+                profile__approved_by__role=UserAccount.Role.DOCUMENT_CONTROLLER
+            )
+        ]
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_evidence(self, obj):

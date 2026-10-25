@@ -870,7 +870,6 @@ def seed_demo_data(reset=False):
                 "manager_approved_date": date.today() - timedelta(days=4),
             }
         )
-        var_2.assigned_users.set([emp_user])
 
         # Monthly Applications across 3 consecutive months
         MonthlyApplication.objects.update_or_create(

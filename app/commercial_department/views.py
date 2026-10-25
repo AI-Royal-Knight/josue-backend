@@ -129,6 +129,7 @@ class VariationListCreateView(APIView):
                 print("Cloudinary upload failed for variation evidence, saving to media storage:", str(e))
                 from django.core.files.storage import default_storage
                 from django.conf import settings
+                evidence_file.seek(0)
                 file_name = default_storage.save(f"variations/{project_id}/{evidence_file.name}", evidence_file)
                 evidence_url = request.build_absolute_uri(settings.MEDIA_URL + file_name)
 
@@ -248,7 +249,8 @@ class VariationSubmitToClientView(APIView):
     def post(self, request, pk):
         """Mark variation as submitted to client. Only commercial department allowed."""
         user = request.user
-        if user.role != "commercial_department" and user.role not in ["admin", "project_admin"]:
+        active_role = request.headers.get("X-Active-Role") or user.role
+        if active_role != "commercial_department" and user.role != "commercial_department":
             return Response(
                 {"error": "Only the commercial department can issue variations to clients."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -310,7 +312,8 @@ class VariationRemindClientView(APIView):
     def post(self, request, pk):
         """Send email reminder to client to sign variation. Only commercial department allowed."""
         user = request.user
-        if user.role != "commercial_department" and user.role not in ["admin", "project_admin"]:
+        active_role = request.headers.get("X-Active-Role") or user.role
+        if active_role != "commercial_department" and user.role != "commercial_department":
             return Response(
                 {"error": "Only the commercial department can send reminders to the client."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -405,6 +408,7 @@ class VariationAssignUsersView(APIView):
             role=UserAccount.Role.EMPLOYEE,
             company=request.user.company,
             profile__is_approved=True,
+            profile__approved_by__role=UserAccount.Role.DOCUMENT_CONTROLLER,
         )
 
         variation.assigned_users.set(valid_users)

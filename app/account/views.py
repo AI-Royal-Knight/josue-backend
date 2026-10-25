@@ -1074,6 +1074,7 @@ class UsersListView(APIView):
                 "expiryTone": expiry_tone,
                 "approvedUser": profile.is_approved if profile else False,
                 "approvedBy": dict(UserAccount.Role.choices).get(profile.approved_by.role, profile.approved_by.role) if profile and profile.approved_by else "",
+                "approvedByRole": profile.approved_by.role if profile and profile.approved_by else None,
                 "digitalSignature": profile.digital_signature if profile else None,
                 "termsAccepted": profile.terms_accepted if profile else False,
                 "passportDocumentUrl": request.build_absolute_uri(profile.passport_document.url) if profile and profile.passport_document else None,

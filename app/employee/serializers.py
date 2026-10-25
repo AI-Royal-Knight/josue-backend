@@ -34,7 +34,11 @@ class RFIMessageSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_author_name(self, obj):
-        return obj.author.full_name or obj.author.email.split('@')[0] if obj.author else "Unknown"
+        if obj.author:
+            if obj.author.first_name or obj.author.last_name:
+                return f"{obj.author.first_name} {obj.author.last_name}".strip()
+            return obj.author.email.split('@')[0]
+        return "Unknown"
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_author_role(self, obj):
@@ -45,27 +49,49 @@ class RFIMessageSerializer(serializers.ModelSerializer):
     def get_attachments(self, obj):
         if obj.document_url:
             import urllib.parse
-            raw = obj.document_url.split('/')[-1]
-            filename = urllib.parse.unquote(raw)
-            return [{"name": filename, "url": obj.document_url}]
+            urls = [u.strip() for u in obj.document_url.split(',') if u.strip()]
+            res = []
+            for u in urls:
+                raw = u.split('?')[0].split('/')[-1]
+                filename = urllib.parse.unquote(raw) or "Attachment"
+                res.append({"name": filename, "url": u})
+            return res
         return []
 
 class DashboardRFISerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.project_name', read_only=True)
     created_by_name = serializers.SerializerMethodField()
     messages = RFIMessageSerializer(many=True, read_only=True)
+    attachments = serializers.SerializerMethodField()
     
     class Meta:
         model = RFI
         fields = [
             'id', 'rfi_number', 'project', 'project_name', 'description', 'trade',
-            'status', 'document_url', 'created_at', 'closed_at',
+            'status', 'document_url', 'attachments', 'created_at', 'closed_at',
             'created_by', 'created_by_name', 'messages', 'assigned_to_technical_department'
         ]
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_created_by_name(self, obj):
-        return obj.created_by.full_name or obj.created_by.email.split('@')[0] if obj.created_by else "Unknown"
+        if obj.created_by:
+            if obj.created_by.first_name or obj.created_by.last_name:
+                return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+            return obj.created_by.email.split('@')[0]
+        return "Unknown"
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_attachments(self, obj):
+        if obj.document_url:
+            import urllib.parse
+            urls = [u.strip() for u in obj.document_url.split(',') if u.strip()]
+            res = []
+            for u in urls:
+                raw = u.split('?')[0].split('/')[-1]
+                filename = urllib.parse.unquote(raw) or "Attachment"
+                res.append({"name": filename, "url": u})
+            return res
+        return []
 
 class DailyRegisterSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='user.first_name', read_only=True)

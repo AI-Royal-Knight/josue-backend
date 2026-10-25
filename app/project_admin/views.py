@@ -950,6 +950,65 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from app.employee.models import RFI, RFIMessage
 from app.employee.serializers import DashboardRFISerializer, RFIMessageSerializer
 
+def save_uploaded_document(file_obj, project_id, request=None, folder_name="rfis"):
+    """
+    Safely uploads a document to Cloudinary with fallback to Django default_storage.
+    Handles images (resource_type='image') vs PDFs/docs (resource_type='raw')
+    and ensures seek(0) is called so file data is never truncated or lost.
+    """
+    if not file_obj:
+        return None
+
+    if hasattr(file_obj, 'seek'):
+        file_obj.seek(0)
+
+    filename = getattr(file_obj, 'name', 'document')
+    ext = (filename.split('.')[-1] if '.' in filename else '').lower()
+    is_image = ext in ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg']
+    res_type = 'image' if is_image else 'raw'
+
+    document_url = None
+    try:
+        import cloudinary.uploader
+        upload_result = cloudinary.uploader.upload(
+            file_obj,
+            resource_type=res_type,
+            folder=f"josue_{folder_name}/{project_id}"
+        )
+        document_url = upload_result.get('secure_url')
+    except Exception as e:
+        print(f"Cloudinary upload ({res_type}) failed: {e}. Trying auto/fallback...")
+        try:
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
+            import cloudinary.uploader
+            upload_result = cloudinary.uploader.upload(
+                file_obj,
+                resource_type='auto',
+                folder=f"josue_{folder_name}/{project_id}"
+            )
+            document_url = upload_result.get('secure_url')
+        except Exception as e2:
+            print(f"Cloudinary auto upload failed: {e2}. Falling back to default_storage...")
+            from django.core.files.storage import default_storage
+            import os
+            import time
+
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
+
+            clean_name = os.path.basename(filename)
+            unique_name = f"{int(time.time())}_{clean_name}"
+            saved_path = default_storage.save(f"{folder_name}/{project_id}/{unique_name}", file_obj)
+
+            relative_url = default_storage.url(saved_path)
+            if request:
+                document_url = request.build_absolute_uri(relative_url)
+            else:
+                document_url = relative_url
+
+    return document_url
+
 class DashboardRFIListView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -957,14 +1016,19 @@ class DashboardRFIListView(APIView):
     @extend_schema(responses={200: dict})
     def get(self, request):
         user = request.user
-        if user.role in ["admin", "project_admin", "super_admin"]:
-            if not user.company:
-                return Response({"rfis": []}, status=status.HTTP_200_OK)
+        active_role = request.headers.get("X-Active-Role") or getattr(user, 'active_role', user.role)
+        is_company_wide = (
+            user.role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"] or
+            active_role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"] or
+            user.is_superuser or user.is_staff
+        )
+
+        if is_company_wide and user.company:
             rfis = RFI.objects.filter(project__company=user.company)
         else:
             rfis = RFI.objects.filter(project__in=user.accessible_projects)
 
-        if user.role == "technical_department":
+        if user.role == "technical_department" or active_role == "technical_department":
             rfis = rfis.filter(assigned_to_technical_department=True)
 
         serializer = DashboardRFISerializer(rfis.order_by('-created_at'), many=True)
@@ -982,33 +1046,22 @@ class DashboardRFIListView(APIView):
             project = Project.objects.get(id=project_id)
         except Project.DoesNotExist:
             return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
-            
-        if user.role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"]:
-            if project.company != user.company:
-                return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
-        else:
-            if not user.accessible_projects.filter(id=project.id).exists():
-                return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+        active_role = request.headers.get("X-Active-Role") or getattr(user, 'active_role', user.role)
+        is_allowed = (
+            user.role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"] or
+            active_role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"] or
+            user.is_superuser or user.is_staff or
+            user.role_assignments.filter(project=project).exists() or
+            user.accessible_projects.filter(id=project.id).exists()
+        )
+        if not is_allowed:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
                 
         description = request.data.get('description', '')
         trade = request.data.get('trade', 'General')
         document = request.FILES.get('document') or request.FILES.get('attachment')
-        document_url = None
-        
-        if document:
-            try:
-                from cloudinary.uploader import upload
-                upload_data = upload(
-                    document,
-                    resource_type="auto",
-                    folder=f"josue_rfis/{project.id}"
-                )
-                document_url = upload_data.get('secure_url')
-            except Exception as e:
-                print("Cloudinary upload failed for RFI creation, saving to media storage:", str(e))
-                from django.core.files.storage import default_storage
-                file_path = default_storage.save(f"rfis/{document.name}", document)
-                document_url = request.build_absolute_uri(default_storage.url(file_path))
+        document_url = save_uploaded_document(document, project.id, request, folder_name="rfis")
                 
         rfi = RFI.objects.create(
             project=project,
@@ -1038,11 +1091,20 @@ class RFICloseView(APIView):
         is_project_director = (
             user.role == "project_director" or 
             active_role == "project_director" or 
-            user.role in ["admin", "super_admin", "managing_director"]
+            user.role_assignments.filter(role="project_director", project=rfi.project).exists() or
+            user.role in ["admin", "super_admin", "managing_director"] or
+            active_role in ["admin", "super_admin", "managing_director"] or
+            user.is_superuser or user.is_staff
         )
 
         if is_project_director:
-            if rfi.project.company != user.company and not user.accessible_projects.filter(id=rfi.project_id).exists():
+            has_project_access = (
+                (user.company and rfi.project.company_id == user.company_id) or
+                user.role_assignments.filter(project=rfi.project).exists() or
+                user.accessible_projects.filter(id=rfi.project_id).exists() or
+                user.is_superuser or user.is_staff
+            )
+            if not has_project_access:
                 return Response({"error": "Unauthorized for this project"}, status=status.HTTP_403_FORBIDDEN)
         elif not is_creator:
             return Response(
@@ -1068,15 +1130,15 @@ class RFIMessageCreateView(APIView):
             return Response({"error": "RFI not found"}, status=status.HTTP_404_NOT_FOUND)
             
         text = request.data.get('text', '')
-        attachment = request.FILES.get('attachment') or request.FILES.get('document')
 
-        author_role = (
+        raw_role = (
             request.data.get('author_role') or 
             request.headers.get('X-Active-Role') or 
             getattr(request.user, 'active_role', None) or 
             request.user.role
         )
-        
+        author_role = str(raw_role).lower().replace('-', '_').replace(' ', '_') if raw_role else request.user.role
+
         message = RFIMessage.objects.create(
             rfi=rfi,
             author=request.user,
@@ -1084,22 +1146,21 @@ class RFIMessageCreateView(APIView):
             text=text
         )
         
-        if attachment:
-            try:
-                from cloudinary.uploader import upload
-                upload_data = upload(
-                    attachment,
-                    resource_type="auto",
-                    folder=f"josue_rfis/{rfi.project_id}"
-                )
-                message.document_url = upload_data.get('secure_url')
-                message.save()
-            except Exception as e:
-                print("Cloudinary upload failed for RFI message, saving to media storage:", str(e))
-                from django.core.files.storage import default_storage
-                file_path = default_storage.save(f"rfis/messages/{attachment.name}", attachment)
-                message.document_url = request.build_absolute_uri(default_storage.url(file_path))
-                message.save()
+        files = request.FILES.getlist('files')
+        if not files:
+            single = request.FILES.get('attachment') or request.FILES.get('document')
+            if single:
+                files = [single]
+
+        uploaded_urls = []
+        for f in files:
+            url = save_uploaded_document(f, rfi.project_id, request, folder_name="rfis/messages")
+            if url:
+                uploaded_urls.append(url)
+
+        if uploaded_urls:
+            message.document_url = ",".join(uploaded_urls)
+            message.save()
                 
         serializer = RFIMessageSerializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -1115,7 +1176,15 @@ class RFIAssignTechnicalView(APIView):
             "contracts_manager", "manager", "managers", "supervisor",
             "admin", "project_admin", "super_admin", "managing_director", "project_director"
         ]
-        if user.role not in allowed_roles and active_role not in allowed_roles:
+        user_role_norm = str(user.role).lower().replace('-', '_').replace(' ', '_') if user.role else ''
+        active_role_norm = str(active_role).lower().replace('-', '_').replace(' ', '_') if active_role else ''
+        has_perm = (
+            user_role_norm in allowed_roles or
+            active_role_norm in allowed_roles or
+            user.is_superuser or user.is_staff or
+            user.role_assignments.filter(role__in=allowed_roles).exists()
+        )
+        if not has_perm:
             return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
 
         try:
@@ -1124,6 +1193,9 @@ class RFIAssignTechnicalView(APIView):
             return Response({"error": "RFI not found"}, status=status.HTTP_404_NOT_FOUND)
 
         raw_assigned = request.data.get("assigned_to_technical_department")
+        if raw_assigned is None:
+            raw_assigned = request.data.get("assigned")
+
         if isinstance(raw_assigned, str):
             assigned = raw_assigned.lower() in ["true", "1", "yes"]
         else:
@@ -1154,7 +1226,8 @@ class ProformaAccessListView(APIView):
         if not project:
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        accesses = ProformaAccess.objects.filter(project=project)
+        from app.account.models import UserAccount
+        accesses = ProformaAccess.objects.filter(project=project, user__role=UserAccount.Role.EMPLOYEE)
         serializer = ProformaAccessSerializer(accesses, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1176,16 +1249,26 @@ class ProformaAccessListView(APIView):
 
         created_count = 0
         from app.account.models import UserAccount
+        target_company = request.user.company or project.company
         for u_id in user_ids:
             try:
-                u = UserAccount.objects.get(id=u_id, company=request.user.company)
+                # Strictly require registered mobile app users (employee role)
+                u = UserAccount.objects.filter(
+                    id=u_id,
+                    role=UserAccount.Role.EMPLOYEE,
+                    is_active=True
+                ).filter(
+                    Q(company=target_company) | (Q(company__company_name__iexact=target_company.company_name) if target_company and target_company.company_name else Q())
+                ).first()
+                if not u:
+                    continue
                 _, created = ProformaAccess.objects.get_or_create(project=project, user=u)
                 if created:
                     created_count += 1
-            except UserAccount.DoesNotExist:
+            except Exception:
                 continue
 
-        accesses = ProformaAccess.objects.filter(project=project)
+        accesses = ProformaAccess.objects.filter(project=project, user__role=UserAccount.Role.EMPLOYEE)
         serializer = ProformaAccessSerializer(accesses, many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
