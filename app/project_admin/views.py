@@ -527,17 +527,25 @@ class CompanyUsersView(APIView):
         role_param = request.query_params.get("role")
         if role_param:
             users = users.filter(role=role_param)
-            
+
+        approved_only = request.query_params.get("approved_only")
+        if approved_only and approved_only.lower() in ["true", "1", "yes"]:
+            users = users.filter(profile__is_approved=True)
+
         users_data = []
         for user in users:
             name = user.full_name
             if not name:
                 name = user.email.split('@')[0]
+            profile = getattr(user, 'profile', None)
             users_data.append({
                 "id": str(user.id),
                 "name": name,
                 "email": user.email,
-                "role": user.role
+                "role": user.role,
+                "approvedUser": profile.is_approved if profile else False,
+                "approvedByRole": profile.approved_by.role if profile and profile.approved_by else None,
+                "approvedBy": dict(UserAccount.Role.choices).get(profile.approved_by.role, profile.approved_by.role) if profile and profile.approved_by else "",
             })
             
         print(f"CompanyUsersView(role={role_param}, company={request.user.company}) returned {len(users_data)} users.")
@@ -952,9 +960,9 @@ from app.employee.serializers import DashboardRFISerializer, RFIMessageSerialize
 
 def save_uploaded_document(file_obj, project_id, request=None, folder_name="rfis"):
     """
-    Safely uploads a document to Cloudinary with fallback to Django default_storage.
-    Handles images (resource_type='image') vs PDFs/docs (resource_type='raw')
-    and ensures seek(0) is called so file data is never truncated or lost.
+    Safely uploads a document. For large files (>10MB, which exceed Cloudinary's free plan limit)
+    or when Cloudinary fails, it saves directly to Django's default_storage.
+    Ensures seek(0) is called so file data is never truncated or lost.
     """
     if not file_obj:
         return None
@@ -963,49 +971,62 @@ def save_uploaded_document(file_obj, project_id, request=None, folder_name="rfis
         file_obj.seek(0)
 
     filename = getattr(file_obj, 'name', 'document')
+    file_size = getattr(file_obj, 'size', 0)
     ext = (filename.split('.')[-1] if '.' in filename else '').lower()
     is_image = ext in ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg']
     res_type = 'image' if is_image else 'raw'
 
     document_url = None
-    try:
-        import cloudinary.uploader
-        upload_result = cloudinary.uploader.upload(
-            file_obj,
-            resource_type=res_type,
-            folder=f"josue_{folder_name}/{project_id}"
-        )
-        document_url = upload_result.get('secure_url')
-    except Exception as e:
-        print(f"Cloudinary upload ({res_type}) failed: {e}. Trying auto/fallback...")
+
+    # Cloudinary free tier has a 10MB (10,485,760 bytes) file size limit.
+    # If the file exceeds 10MB, directly use default_storage to prevent timeouts and 400 errors.
+    CLOUDINARY_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+
+    if file_size <= CLOUDINARY_MAX_BYTES:
         try:
-            if hasattr(file_obj, 'seek'):
-                file_obj.seek(0)
             import cloudinary.uploader
             upload_result = cloudinary.uploader.upload(
                 file_obj,
-                resource_type='auto',
+                resource_type=res_type,
                 folder=f"josue_{folder_name}/{project_id}"
             )
             document_url = upload_result.get('secure_url')
-        except Exception as e2:
-            print(f"Cloudinary auto upload failed: {e2}. Falling back to default_storage...")
-            from django.core.files.storage import default_storage
-            import os
-            import time
+        except Exception as e:
+            err_str = str(e).lower()
+            print(f"Cloudinary upload ({res_type}) failed: {e}. Checking fallback...")
+            # If not a size error and it's not raw, try auto
+            if "too large" not in err_str and res_type != 'auto':
+                try:
+                    if hasattr(file_obj, 'seek'):
+                        file_obj.seek(0)
+                    import cloudinary.uploader
+                    upload_result = cloudinary.uploader.upload(
+                        file_obj,
+                        resource_type='auto',
+                        folder=f"josue_{folder_name}/{project_id}"
+                    )
+                    document_url = upload_result.get('secure_url')
+                except Exception as e2:
+                    print(f"Cloudinary auto upload failed: {e2}. Falling back to default_storage...")
 
-            if hasattr(file_obj, 'seek'):
-                file_obj.seek(0)
+    # Fallback to local / default storage if Cloudinary wasn't used or failed
+    if not document_url:
+        from django.core.files.storage import default_storage
+        import os
+        import time
 
-            clean_name = os.path.basename(filename)
-            unique_name = f"{int(time.time())}_{clean_name}"
-            saved_path = default_storage.save(f"{folder_name}/{project_id}/{unique_name}", file_obj)
+        if hasattr(file_obj, 'seek'):
+            file_obj.seek(0)
 
-            relative_url = default_storage.url(saved_path)
-            if request:
-                document_url = request.build_absolute_uri(relative_url)
-            else:
-                document_url = relative_url
+        clean_name = os.path.basename(filename)
+        unique_name = f"{int(time.time())}_{clean_name}"
+        saved_path = default_storage.save(f"{folder_name}/{project_id}/{unique_name}", file_obj)
+
+        relative_url = default_storage.url(saved_path)
+        if request:
+            document_url = request.build_absolute_uri(relative_url)
+        else:
+            document_url = relative_url
 
     return document_url
 
@@ -1174,7 +1195,8 @@ class RFIAssignTechnicalView(APIView):
         active_role = request.headers.get("X-Active-Role") or getattr(user, 'active_role', user.role)
         allowed_roles = [
             "contracts_manager", "manager", "managers", "supervisor",
-            "admin", "project_admin", "super_admin", "managing_director", "project_director"
+            "admin", "project_admin", "super_admin", "managing_director", "project_director",
+            "commercial_department", "technical_department"
         ]
         user_role_norm = str(user.role).lower().replace('-', '_').replace(' ', '_') if user.role else ''
         active_role_norm = str(active_role).lower().replace('-', '_').replace(' ', '_') if active_role else ''
@@ -1207,6 +1229,14 @@ class RFIAssignTechnicalView(APIView):
         serializer = DashboardRFISerializer(rfi)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=dict, responses={200: dict})
+    def post(self, request, pk):
+        return self.patch(request, pk)
+
+    @extend_schema(request=dict, responses={200: dict})
+    def put(self, request, pk):
+        return self.patch(request, pk)
+
 
 from .models import ProformaAccess
 from .serializers import ProformaAccessSerializer
@@ -1227,7 +1257,11 @@ class ProformaAccessListView(APIView):
             return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
         from app.account.models import UserAccount
-        accesses = ProformaAccess.objects.filter(project=project, user__role=UserAccount.Role.EMPLOYEE)
+        accesses = ProformaAccess.objects.filter(
+            project=project,
+            user__role=UserAccount.Role.EMPLOYEE,
+            user__profile__is_approved=True
+        )
         serializer = ProformaAccessSerializer(accesses, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1252,11 +1286,12 @@ class ProformaAccessListView(APIView):
         target_company = request.user.company or project.company
         for u_id in user_ids:
             try:
-                # Strictly require registered mobile app users (employee role)
+                # Strictly require registered mobile app users (employee role) who are approved
                 u = UserAccount.objects.filter(
                     id=u_id,
                     role=UserAccount.Role.EMPLOYEE,
-                    is_active=True
+                    is_active=True,
+                    profile__is_approved=True
                 ).filter(
                     Q(company=target_company) | (Q(company__company_name__iexact=target_company.company_name) if target_company and target_company.company_name else Q())
                 ).first()
@@ -1268,7 +1303,11 @@ class ProformaAccessListView(APIView):
             except Exception:
                 continue
 
-        accesses = ProformaAccess.objects.filter(project=project, user__role=UserAccount.Role.EMPLOYEE)
+        accesses = ProformaAccess.objects.filter(
+            project=project,
+            user__role=UserAccount.Role.EMPLOYEE,
+            user__profile__is_approved=True
+        )
         serializer = ProformaAccessSerializer(accesses, many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

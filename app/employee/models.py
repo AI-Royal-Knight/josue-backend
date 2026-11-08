@@ -51,7 +51,7 @@ class RFI(BaseModel):
     trade = models.CharField(max_length=100, default='General')
     description = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='OPEN')
-    document_url = models.URLField(max_length=500, blank=True, null=True)
+    document_url = models.TextField(blank=True, null=True)
     
     closed_at = models.DateTimeField(null=True, blank=True)
     assigned_to_technical_department = models.BooleanField(default=False)
@@ -86,7 +86,7 @@ class RFIMessage(BaseModel):
     author = models.ForeignKey(UserAccount, on_delete=models.CASCADE, related_name='rfi_messages')
     author_role = models.CharField(max_length=50, blank=True, null=True)
     text = models.TextField()
-    document_url = models.URLField(max_length=500, blank=True, null=True)
+    document_url = models.TextField(blank=True, null=True)
     
     class Meta:
         ordering = ['created_at']
@@ -101,7 +101,7 @@ class RAMS(BaseModel):
     description = models.TextField(blank=True, null=True)
     date = models.DateField()
     review_date = models.DateField(null=True, blank=True)
-    document_url = models.URLField(max_length=500, blank=True, null=True)
+    document_url = models.TextField(blank=True, null=True)
     signed_document_url = models.URLField(max_length=500, blank=True, null=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
@@ -117,7 +117,7 @@ class DailyBriefing(BaseModel):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     date = models.DateField()
-    document_url = models.URLField(max_length=500, blank=True, null=True)
+    document_url = models.TextField(blank=True, null=True)
     signed_document_url = models.URLField(max_length=500, blank=True, null=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
@@ -133,7 +133,7 @@ class ToolboxTalk(BaseModel):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     date = models.DateField()
-    document_url = models.URLField(max_length=500, blank=True, null=True)
+    document_url = models.TextField(blank=True, null=True)
     signed_document_url = models.URLField(max_length=500, blank=True, null=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

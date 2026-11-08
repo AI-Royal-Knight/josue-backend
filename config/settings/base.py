@@ -297,7 +297,7 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-# Upload Size Limits (allow up to 50 MB)
-DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB (Django default is 2.5 MB)
-FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB (Django default is 2.5 MB)
+# Upload Size Limits (allow up to 100 MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB (Django default is 2.5 MB)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB (Django default is 2.5 MB)
 

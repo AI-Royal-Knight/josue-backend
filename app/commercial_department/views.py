@@ -401,15 +401,26 @@ class VariationAssignUsersView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Only app users (role == 'employee') from the user's company who have been approved by the document controller can be assigned
+        # Only app users (role == 'employee') who have been approved by the document controller can be assigned
         from app.account.models import UserAccount
+        from django.db.models import Q
+        target_company = variation.project.company or request.user.company
         valid_users = UserAccount.objects.filter(
             id__in=assigned_user_ids,
             role=UserAccount.Role.EMPLOYEE,
-            company=request.user.company,
             profile__is_approved=True,
             profile__approved_by__role=UserAccount.Role.DOCUMENT_CONTROLLER,
         )
+        if target_company:
+            valid_users = valid_users.filter(
+                Q(company=target_company) | (Q(company__company_name__iexact=target_company.company_name) if target_company.company_name else Q())
+            )
+
+        if len(assigned_user_ids) > 0 and valid_users.count() < len(assigned_user_ids):
+            return Response(
+                {"error": "Only mobile app users accepted by the Document Controller can be assigned to variations."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         variation.assigned_users.set(valid_users)
         variation.save()
