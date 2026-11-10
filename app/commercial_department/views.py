@@ -112,31 +112,30 @@ class VariationListCreateView(APIView):
             for l in lines_data
         )
 
+        import re
+        existing_vos = Variation.objects.filter(project_id=project_id).values_list("vo_number", flat=True)
+        max_vo_num = 0
+        for v_no in existing_vos:
+            if v_no:
+                m = re.search(r"(\d+)", v_no)
+                if m:
+                    max_vo_num = max(max_vo_num, int(m.group(1)))
+        next_vo = f"VO{str(max_vo_num + 1).zfill(3)}"
+
         # Determine variation sheet number (A, B, C... based on count for this project)
         count = Variation.objects.filter(project_id=project_id).count()
         sheet_letter = chr(65 + count) if count < 26 else str(count + 1)
         
         evidence_url = ""
         if evidence_file:
-            try:
-                upload_result = cloudinary.uploader.upload(
-                    evidence_file,
-                    resource_type='auto',
-                    folder=f"josue_variations/{project_id}"
-                )
-                evidence_url = upload_result.get('secure_url', '')
-            except Exception as e:
-                print("Cloudinary upload failed for variation evidence, saving to media storage:", str(e))
-                from django.core.files.storage import default_storage
-                from django.conf import settings
-                evidence_file.seek(0)
-                file_name = default_storage.save(f"variations/{project_id}/{evidence_file.name}", evidence_file)
-                evidence_url = request.build_absolute_uri(settings.MEDIA_URL + file_name)
+            from app.project_admin.views import save_uploaded_document
+            evidence_url = save_uploaded_document(evidence_file, project_id, request, folder_name="variations") or ""
 
         with transaction.atomic():
             variation = Variation.objects.create(
                 project_id=project_id,
                 created_by=request.user,
+                vo_number=next_vo,
                 site_instruction_no=site_instruction_no,
                 attention_of=attention_of,
                 description_of_works=description,
@@ -249,8 +248,9 @@ class VariationSubmitToClientView(APIView):
     def post(self, request, pk):
         """Mark variation as submitted to client. Only commercial department allowed."""
         user = request.user
-        active_role = request.headers.get("X-Active-Role") or user.role
-        if active_role != "commercial_department" and user.role != "commercial_department":
+        active_role = request.headers.get("X-Active-Role")
+        effective_role = active_role if active_role else user.role
+        if effective_role != "commercial_department":
             return Response(
                 {"error": "Only the commercial department can issue variations to clients."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -312,8 +312,9 @@ class VariationRemindClientView(APIView):
     def post(self, request, pk):
         """Send email reminder to client to sign variation. Only commercial department allowed."""
         user = request.user
-        active_role = request.headers.get("X-Active-Role") or user.role
-        if active_role != "commercial_department" and user.role != "commercial_department":
+        active_role = request.headers.get("X-Active-Role")
+        effective_role = active_role if active_role else user.role
+        if effective_role != "commercial_department":
             return Response(
                 {"error": "Only the commercial department can send reminders to the client."},
                 status=status.HTTP_403_FORBIDDEN,

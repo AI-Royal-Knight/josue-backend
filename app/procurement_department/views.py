@@ -384,7 +384,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
         # Filter by project if provided in query params
         params = getattr(self.request, 'query_params', getattr(self.request, 'GET', {}))
         project_param = params.get('project') or params.get('project_id')
-        if project_param and project_param != 'undefined' and project_param != 'null':
+        if project_param and project_param not in ('undefined', 'null', 'all'):
             qs = qs.filter(project_id=project_param)
 
         return qs.order_by("-created_at")
@@ -567,12 +567,12 @@ class QuotationViewSet(viewsets.ModelViewSet):
         supplier_name = data.get('supplier_name')
         supplier_email = data.get('supplier_email')
         
-        # If supplier is not provided or empty string
-        if not supplier_id:
+        # If supplier is not provided or empty string / null / unregistered
+        if not supplier_id or str(supplier_id).lower() in ("null", "undefined", "unregistered", ""):
             data['supplier'] = None
             if not supplier_name and supplier_email:
                 first_email = supplier_email.split(',')[0].strip()
-                supplier_name = first_email.split('@')[0].replace('.', ' ').replace('_', ' ').title()
+                supplier_name = first_email.split('@')[0].replace('.', ' ').replace('_', ' ').replace('-', ' ').title()
                 data['supplier_name'] = supplier_name
             elif supplier_name:
                 data['supplier_name'] = supplier_name
@@ -580,7 +580,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
             # If we have email and/or name, try to auto-associate with CompanySupplier if possible
             company = None
             project_id = data.get('project')
-            if project_id:
+            if project_id and str(project_id).lower() not in ("null", "undefined", "all", ""):
                 proj = Project.objects.filter(id=project_id).first()
                 if proj:
                     company = proj.company
@@ -593,24 +593,33 @@ class QuotationViewSet(viewsets.ModelViewSet):
 
             if company and supplier_email:
                 first_email = supplier_email.split(',')[0].strip()
-                try:
-                    user, _ = UserAccount.objects.get_or_create(
-                        email=first_email,
-                        defaults={'role': UserAccount.Role.SUPPLIER, 'is_active': True}
-                    )
-                    from app.account.models import SupplierProfile, CompanySupplier
-                    supplier_profile, _ = SupplierProfile.objects.get_or_create(
-                        user=user,
-                        defaults={'company_name': supplier_name or first_email}
-                    )
-                    company_supplier, _ = CompanySupplier.objects.get_or_create(
-                        company=company,
-                        supplier=supplier_profile,
-                        defaults={'eom_payment_terms': 30, 'credit_limit': 0.00}
-                    )
-                    data['supplier'] = company_supplier.id
-                except Exception as e:
-                    print(f"Notice: CompanySupplier auto-create skipped: {e}")
+                if "@" in first_email:
+                    try:
+                        clean_email = first_email.lower()
+                        user, _ = UserAccount.objects.get_or_create(
+                            email=clean_email,
+                            defaults={
+                                'role': UserAccount.Role.SUPPLIER,
+                                'is_active': True,
+                                'first_name': supplier_name or clean_email.split('@')[0],
+                                'last_name': 'Supplier'
+                            }
+                        )
+                        from app.account.models import SupplierProfile, CompanySupplier
+                        supplier_profile, _ = SupplierProfile.objects.get_or_create(
+                            user=user,
+                            defaults={'company_name': supplier_name or clean_email}
+                        )
+                        company_supplier, _ = CompanySupplier.objects.get_or_create(
+                            company=company,
+                            supplier=supplier_profile,
+                            defaults={'eom_payment_terms': 30, 'credit_limit': 0.00}
+                        )
+                        data['supplier'] = str(company_supplier.id)
+                    except Exception as e:
+                        print(f"Notice: CompanySupplier auto-create skipped: {e}")
+                        data['supplier'] = None
+                else:
                     data['supplier'] = None
 
         # Set modified data for serializer
@@ -847,33 +856,40 @@ class CallOffListViewSet(viewsets.GenericViewSet, viewsets.mixins.ListModelMixin
         # Base filter: Quotation must be approved
         queryset = QuotationLineItem.objects.filter(quotation__status='Approved')
         
-        if user.role == UserAccount.Role.ADMIN:
-            qs = queryset.filter(quotation__project__company=user.company)
-        elif user.role == UserAccount.Role.SUPER_ADMIN:
+        if user.role == UserAccount.Role.SUPER_ADMIN:
             qs = queryset
-        else:
+        elif user.role == UserAccount.Role.ADMIN:
+            qs = queryset.filter(quotation__project__company=user.company)
+        elif user.role == UserAccount.Role.PROCUREMENT_DEPARTMENT:
             role_assignment = RoleAssignment.objects.filter(
                 user=user, 
                 role=UserAccount.Role.PROCUREMENT_DEPARTMENT
             ).first()
             company = (role_assignment.company if role_assignment else None) or user.company
-            
             user_qs = QuotationLineItem.objects.none()
             if company:
                 user_qs = queryset.filter(quotation__project__company=company)
-                
-            # Include those assigned to user
             assigned_qs = queryset.filter(quotation__project__in=user.accessible_projects)
             qs = (user_qs | assigned_qs).distinct()
-            
             if company:
                 qs = qs.filter(quotation__project__company=company)
+        else:
+            # Roles like contracts_manager, managers, supervisor, etc.
+            # must only access line items for projects assigned to them
+            qs = queryset.filter(quotation__project__in=user.accessible_projects)
 
         # Filter by project query param
         params = getattr(self.request, 'query_params', getattr(self.request, 'GET', {}))
         project_param = params.get('project') or params.get('project_id')
-        if project_param and project_param != 'undefined' and project_param != 'null':
+        if project_param and project_param not in ('undefined', 'null', 'all', ''):
             qs = qs.filter(quotation__project_id=project_param)
+        elif not project_param or project_param in ('undefined', 'null', 'all', ''):
+            # When viewing all accessible projects or no project param is provided:
+            # Non-admins should strictly be restricted to their accessible projects
+            if user.role not in (UserAccount.Role.ADMIN, UserAccount.Role.SUPER_ADMIN) and user.role != UserAccount.Role.PROCUREMENT_DEPARTMENT:
+                qs = qs.filter(quotation__project__in=user.accessible_projects)
+            elif user.role == UserAccount.Role.ADMIN and user.company:
+                qs = qs.filter(quotation__project__company=user.company)
 
         return qs.select_related(
             'quotation', 'quotation__project', 'quotation__main_folder', 
