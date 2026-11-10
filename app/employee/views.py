@@ -303,16 +303,35 @@ class MyFolderSubfoldersView(APIView):
             if calculated_labour_target == 0 and subfolder.labour_target:
                 calculated_labour_target = float(subfolder.labour_target)
 
-            subfolders_data.append({
-                "id": str(subfolder.id),
-                "name": subfolder.name,
-                "project_value": str(subfolder.project_value),
-                "labour_target": str(calculated_labour_target),
-                "rows": subfolder.rows,
-                "hide_labour_target": assignment.hide_labour_target,
-                "assignment_id": str(assignment.id),
-                "employee_labour_value": str(assignment.employee_labour_value) if assignment.employee_labour_value is not None else None,
-            })
+            # If labour target is hidden, hide targets from the employee and only show descriptions
+            if assignment.hide_labour_target:
+                sanitized_rows = [
+                    {
+                        "workSection": r.get("workSection", ""),
+                        "workArea": r.get("workArea", ""),
+                        "labourTarget": "",
+                    }
+                    for r in (subfolder.rows or [])
+                ]
+                subfolders_data.append({
+                    "id": str(subfolder.id),
+                    "name": subfolder.name,
+                    "labour_target": "",
+                    "rows": sanitized_rows,
+                    "hide_labour_target": True,
+                    "assignment_id": str(assignment.id),
+                    "employee_labour_value": str(assignment.employee_labour_value) if assignment.employee_labour_value is not None else None,
+                })
+            else:
+                subfolders_data.append({
+                    "id": str(subfolder.id),
+                    "name": subfolder.name,
+                    "labour_target": str(calculated_labour_target),
+                    "rows": subfolder.rows,
+                    "hide_labour_target": False,
+                    "assignment_id": str(assignment.id),
+                    "employee_labour_value": str(assignment.employee_labour_value) if assignment.employee_labour_value is not None else None,
+                })
 
         return Response({"subfolders": subfolders_data}, status=status.HTTP_200_OK)
 
@@ -424,8 +443,7 @@ class SubfolderTasksView(APIView):
                 "row_index": i,
                 "work_section": work_section,
                 "work_area": work_area,
-                "labour_target": str(labour_target) if labour_target is not None else None,
-                "project_value": str(project_value) if project_value is not None else None,
+                "labour_target": None if assignment.hide_labour_target else (str(labour_target) if labour_target is not None else None),
                 "sent_to_bucket": i in submitted_row_indices,
             })
 
@@ -436,7 +454,7 @@ class SubfolderTasksView(APIView):
             "subfolder_name": subfolder.name,
             "assignment_id": str(assignment.id),
             "hide_labour_target": assignment.hide_labour_target,
-            "total_labour_target": str(assignment.subfolder.labour_target or 0),
+            "total_labour_target": None if assignment.hide_labour_target else str(assignment.subfolder.labour_target or 0),
             "tasks": tasks,
         }, status=status.HTTP_200_OK)
 
@@ -598,16 +616,8 @@ class RFICreateView(APIView):
 
         document_url = None
         if attachment:
-            try:
-                # Upload to Cloudinary
-                upload_result = cloudinary.uploader.upload(
-                    attachment,
-                    resource_type='auto',
-                    folder=f"josue_rfis/{active_log.project.id}"
-                )
-                document_url = upload_result.get('secure_url')
-            except Exception as e:
-                return Response({"error": f"Failed to upload document: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+            from app.project_admin.views import save_uploaded_document
+            document_url = save_uploaded_document(attachment, active_log.project.id, request, folder_name="rfis")
 
         rfi = RFI.objects.create(
             project=active_log.project,
@@ -616,7 +626,7 @@ class RFICreateView(APIView):
             document_url=document_url
         )
 
-        serializer = RFISerializer(rfi)
+        serializer = RFISerializer(rfi, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 

@@ -178,13 +178,20 @@ class ProjectFinancialBreakdownView(APIView):
             var_mat = var_agg['mat'] or 0
 
             from app.project_admin.models import UserInvoice
+            signed_off_filter = (
+                Q(supervisor_approved=True) |
+                Q(manager_approved=True) |
+                Q(contracts_manager_approved=True) |
+                Q(project_director_approved=True) |
+                Q(managing_director_approved=True)
+            )
             var_invoices = UserInvoice.objects.filter(
                 project=project,
                 source_type=UserInvoice.SourceType.VARIATION,
                 status=UserInvoice.Status.SUBMITTED,
                 date__lte=current_end,
                 date__gte=current_start
-            )
+            ).filter(signed_off_filter)
             var_ids = [str(vid) for vid in var_invoices.values_list('source_id', flat=True) if vid]
             if var_ids:
                 var_lab_agg = Variation.objects.filter(id__in=var_ids).aggregate(lab=Sum('lines__labour_target'))
@@ -212,7 +219,7 @@ class ProjectFinancialBreakdownView(APIView):
                 
                 user_claim = var_invoices.filter(source_id=str(vid)).aggregate(t=Sum('total'))['t'] or 0
                 
-                percentage = float(user_claim) / float(v_lab_target)
+                percentage = min(float(user_claim) / float(v_lab_target), 1.0)
                 var_claim += float(v_total) * percentage
             
             # PO Call Offs
@@ -237,14 +244,14 @@ class ProjectFinancialBreakdownView(APIView):
             loading_clearing = LoadingClearingBooking.objects.filter(project=project, date__lte=current_end, date__gte=current_start, is_approved=True).aggregate(t=Sum('amount'))['t'] or 0
             management_prelims = ManagementPrelimBooking.objects.filter(project=project, date__lte=current_end, date__gte=current_start, is_approved=True).aggregate(t=Sum('amount'))['t'] or 0
             
-            # Labour target expenditure booked off by mobile app users
+            # Labour target expenditure booked off and signed off by mobile app users
             lt_invoices = UserInvoice.objects.filter(
                 project=project,
                 source_type=UserInvoice.SourceType.LABOUR_TARGET,
                 status=UserInvoice.Status.SUBMITTED,
                 date__lte=current_end,
                 date__gte=current_start
-            )
+            ).filter(signed_off_filter)
             labour_target = float(lt_invoices.aggregate(t=Sum('total'))['t'] or 0.0)
 
             # Calculate project value booked via labour target connection
@@ -272,7 +279,7 @@ class ProjectFinancialBreakdownView(APIView):
                             row_lt = float(row.get('labourTarget', 0) or 0)
                             inv_amt = float(inv.total or 0)
                             if row_lt > 0:
-                                booked_project_value += (inv_amt / row_lt) * row_pv
+                                booked_project_value += min(inv_amt / row_lt, 1.0) * row_pv
                             else:
                                 booked_project_value += inv_amt
                     except (ValueError, TypeError):
@@ -282,7 +289,7 @@ class ProjectFinancialBreakdownView(APIView):
                     sub_lt = float(subfolder.labour_target or 0) if hasattr(subfolder, 'labour_target') else 0
                     inv_amt = float(inv.total or 0)
                     if sub_lt > 0:
-                        booked_project_value += (inv_amt / sub_lt) * sub_pv
+                        booked_project_value += min(inv_amt / sub_lt, 1.0) * sub_pv
                     else:
                         booked_project_value += inv_amt
 
@@ -960,9 +967,9 @@ from app.employee.serializers import DashboardRFISerializer, RFIMessageSerialize
 
 def save_uploaded_document(file_obj, project_id, request=None, folder_name="rfis"):
     """
-    Safely uploads a document. For large files (>10MB, which exceed Cloudinary's free plan limit)
-    or when Cloudinary fails, it saves directly to Django's default_storage.
-    Ensures seek(0) is called so file data is never truncated or lost.
+    Safely uploads a document. Saves directly to Django's default_storage.
+    Handles up to 100MB files, preserves original filenames without random hashes,
+    and returns URLs suitable for direct inline browser preview (PDF/image) and download.
     """
     if not file_obj:
         return None
@@ -971,62 +978,19 @@ def save_uploaded_document(file_obj, project_id, request=None, folder_name="rfis
         file_obj.seek(0)
 
     filename = getattr(file_obj, 'name', 'document')
-    file_size = getattr(file_obj, 'size', 0)
-    ext = (filename.split('.')[-1] if '.' in filename else '').lower()
-    is_image = ext in ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg']
-    res_type = 'image' if is_image else 'raw'
+    from django.core.files.storage import default_storage
+    import os
+    import time
 
-    document_url = None
+    clean_name = os.path.basename(filename)
+    unique_name = f"{int(time.time())}_{clean_name}"
+    saved_path = default_storage.save(f"{folder_name}/{project_id}/{unique_name}", file_obj)
 
-    # Cloudinary free tier has a 10MB (10,485,760 bytes) file size limit.
-    # If the file exceeds 10MB, directly use default_storage to prevent timeouts and 400 errors.
-    CLOUDINARY_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
-
-    if file_size <= CLOUDINARY_MAX_BYTES:
-        try:
-            import cloudinary.uploader
-            upload_result = cloudinary.uploader.upload(
-                file_obj,
-                resource_type=res_type,
-                folder=f"josue_{folder_name}/{project_id}"
-            )
-            document_url = upload_result.get('secure_url')
-        except Exception as e:
-            err_str = str(e).lower()
-            print(f"Cloudinary upload ({res_type}) failed: {e}. Checking fallback...")
-            # If not a size error and it's not raw, try auto
-            if "too large" not in err_str and res_type != 'auto':
-                try:
-                    if hasattr(file_obj, 'seek'):
-                        file_obj.seek(0)
-                    import cloudinary.uploader
-                    upload_result = cloudinary.uploader.upload(
-                        file_obj,
-                        resource_type='auto',
-                        folder=f"josue_{folder_name}/{project_id}"
-                    )
-                    document_url = upload_result.get('secure_url')
-                except Exception as e2:
-                    print(f"Cloudinary auto upload failed: {e2}. Falling back to default_storage...")
-
-    # Fallback to local / default storage if Cloudinary wasn't used or failed
-    if not document_url:
-        from django.core.files.storage import default_storage
-        import os
-        import time
-
-        if hasattr(file_obj, 'seek'):
-            file_obj.seek(0)
-
-        clean_name = os.path.basename(filename)
-        unique_name = f"{int(time.time())}_{clean_name}"
-        saved_path = default_storage.save(f"{folder_name}/{project_id}/{unique_name}", file_obj)
-
-        relative_url = default_storage.url(saved_path)
-        if request:
-            document_url = request.build_absolute_uri(relative_url)
-        else:
-            document_url = relative_url
+    relative_url = default_storage.url(saved_path)
+    if request:
+        document_url = request.build_absolute_uri(relative_url)
+    else:
+        document_url = relative_url
 
     return document_url
 
@@ -1039,8 +1003,14 @@ class DashboardRFIListView(APIView):
         user = request.user
         active_role = request.headers.get("X-Active-Role") or getattr(user, 'active_role', user.role)
         is_company_wide = (
-            user.role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"] or
-            active_role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"] or
+            user.role in [
+                "admin", "project_admin", "super_admin", "managing_director",
+                "project_director", "technical_department"
+            ] or
+            active_role in [
+                "admin", "project_admin", "super_admin", "managing_director",
+                "project_director", "technical_department"
+            ] or
             user.is_superuser or user.is_staff
         )
 
@@ -1052,7 +1022,7 @@ class DashboardRFIListView(APIView):
         if user.role == "technical_department" or active_role == "technical_department":
             rfis = rfis.filter(assigned_to_technical_department=True)
 
-        serializer = DashboardRFISerializer(rfis.order_by('-created_at'), many=True)
+        serializer = DashboardRFISerializer(rfis.order_by('-created_at'), many=True, context={'request': request})
         return Response({"rfis": serializer.data}, status=status.HTTP_200_OK)
 
     @extend_schema(request=dict, responses={200: dict})
@@ -1069,9 +1039,14 @@ class DashboardRFIListView(APIView):
             return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
         active_role = request.headers.get("X-Active-Role") or getattr(user, 'active_role', user.role)
+        allowed_roles = [
+            "admin", "project_admin", "super_admin", "managing_director",
+            "project_director", "contracts_manager", "manager", "managers",
+            "supervisor", "technical_department", "commercial_department"
+        ]
         is_allowed = (
-            user.role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"] or
-            active_role in ["admin", "project_admin", "super_admin", "managing_director", "project_director"] or
+            user.role in allowed_roles or
+            active_role in allowed_roles or
             user.is_superuser or user.is_staff or
             user.role_assignments.filter(project=project).exists() or
             user.accessible_projects.filter(id=project.id).exists()
@@ -1081,8 +1056,22 @@ class DashboardRFIListView(APIView):
                 
         description = request.data.get('description', '')
         trade = request.data.get('trade', 'General')
-        document = request.FILES.get('document') or request.FILES.get('attachment')
-        document_url = save_uploaded_document(document, project.id, request, folder_name="rfis")
+        
+        uploaded_files = request.FILES.getlist('files')
+        if not uploaded_files:
+            uploaded_files = request.FILES.getlist('document') or request.FILES.getlist('attachment')
+        if not uploaded_files:
+            single = request.FILES.get('document') or request.FILES.get('attachment') or request.FILES.get('file')
+            if single:
+                uploaded_files = [single]
+
+        uploaded_urls = []
+        for f in uploaded_files:
+            url = save_uploaded_document(f, project.id, request, folder_name="rfis")
+            if url:
+                uploaded_urls.append(url)
+
+        document_url = ",".join(uploaded_urls) if uploaded_urls else None
                 
         rfi = RFI.objects.create(
             project=project,
@@ -1092,8 +1081,21 @@ class DashboardRFIListView(APIView):
             document_url=document_url
         )
         
-        serializer = DashboardRFISerializer(rfi)
+        serializer = DashboardRFISerializer(rfi, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+class DashboardRFIDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: dict})
+    def get(self, request, pk):
+        try:
+            rfi = RFI.objects.get(pk=pk)
+        except RFI.DoesNotExist:
+            return Response({"error": "RFI not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = DashboardRFISerializer(rfi, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class RFICloseView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1136,7 +1138,7 @@ class RFICloseView(APIView):
         rfi.status = 'CLOSED'
         rfi.save()
         
-        serializer = DashboardRFISerializer(rfi)
+        serializer = DashboardRFISerializer(rfi, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 class RFIMessageCreateView(APIView):
@@ -1169,7 +1171,9 @@ class RFIMessageCreateView(APIView):
         
         files = request.FILES.getlist('files')
         if not files:
-            single = request.FILES.get('attachment') or request.FILES.get('document')
+            files = request.FILES.getlist('attachment') or request.FILES.getlist('document')
+        if not files:
+            single = request.FILES.get('attachment') or request.FILES.get('document') or request.FILES.get('file')
             if single:
                 files = [single]
 
@@ -1183,7 +1187,7 @@ class RFIMessageCreateView(APIView):
             message.document_url = ",".join(uploaded_urls)
             message.save()
                 
-        serializer = RFIMessageSerializer(message)
+        serializer = RFIMessageSerializer(message, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class RFIAssignTechnicalView(APIView):
@@ -1226,7 +1230,25 @@ class RFIAssignTechnicalView(APIView):
         rfi.assigned_to_technical_department = assigned
         rfi.save()
 
-        serializer = DashboardRFISerializer(rfi)
+        # Notify Technical Department if assigned
+        if assigned and rfi.project and rfi.project.company:
+            try:
+                from app.account.models import Notification, UserAccount
+                tech_users = UserAccount.objects.filter(
+                    company=rfi.project.company,
+                    role=UserAccount.Role.TECHNICAL_DEPARTMENT,
+                    is_active=True
+                )
+                for tu in tech_users:
+                    Notification.objects.create(
+                        user=tu,
+                        title="New RFI Assigned to Technical Department",
+                        message=f"RFI {rfi.rfi_number} for project '{rfi.project.project_name}' has been assigned to your department."
+                    )
+            except Exception as e:
+                print(f"Could not create notification for Technical Department: {e}")
+
+        serializer = DashboardRFISerializer(rfi, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(request=dict, responses={200: dict})

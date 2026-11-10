@@ -71,12 +71,17 @@ class CMSubfolderUpdateView(APIView):
                     continue
                 user_id = user_data.get('id')
                 hide_labour = asn.get('hide_labour_target', False)
-                FolderAssignment.objects.create(
+                assignment = FolderAssignment.objects.create(
                     subfolder=subfolder,
                     user_id=user_id,
                     hide_labour_target=hide_labour,
                     is_management_assignment=False
                 )
+                try:
+                    user_obj = UserAccount.objects.get(id=user_id)
+                    user_obj.assigned_projects.add(subfolder.folder.project)
+                except UserAccount.DoesNotExist:
+                    pass
 
         subfolder.save()
         return Response({"message": "Subfolder updated successfully."}, status=status.HTTP_200_OK)

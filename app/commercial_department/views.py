@@ -445,19 +445,27 @@ class MonthlyApplicationListCreateView(APIView):
         apps = MonthlyApplication.objects.filter(project_id=project_id)
         serializer = MonthlyApplicationSerializer(apps, many=True)
 
-        # Calculate current draft based on actual booked app user labour targets and approved variations
+        # Calculate current draft based on actual booked app user labour targets (signed off) and approved variations
         from app.project_admin.models import UserInvoice, ProjectSubfolder, Project, FolderAssignment
+        from django.db.models import Q
         
         assignments = FolderAssignment.objects.filter(
             subfolder__folder__project_id=project_id
         ).select_related('subfolder')
         assignment_map = {str(a.id): a.subfolder for a in assignments}
         
+        signed_off_filter = (
+            Q(supervisor_approved=True) |
+            Q(manager_approved=True) |
+            Q(contracts_manager_approved=True) |
+            Q(project_director_approved=True) |
+            Q(managing_director_approved=True)
+        )
         invoices = UserInvoice.objects.filter(
             project_id=project_id,
             source_type=UserInvoice.SourceType.LABOUR_TARGET,
             status=UserInvoice.Status.SUBMITTED
-        )
+        ).filter(signed_off_filter)
         
         contract_works_total = 0.0
         for inv in invoices:
@@ -477,7 +485,7 @@ class MonthlyApplicationListCreateView(APIView):
                         row_lt = float(row.get('labourTarget', 0) or 0)
                         booked_val = float(inv.total or 0)
                         if row_lt > 0:
-                            contract_works_total += (booked_val / row_lt) * row_pv
+                            contract_works_total += min(booked_val / row_lt, 1.0) * row_pv
                         else:
                             contract_works_total += booked_val
                 except (ValueError, TypeError):
@@ -487,13 +495,14 @@ class MonthlyApplicationListCreateView(APIView):
                 sub_lt = float(subfolder.labour_target or 0) if hasattr(subfolder, 'labour_target') else 0
                 booked_val = float(inv.total or 0)
                 if sub_lt > 0:
-                    contract_works_total += (booked_val / sub_lt) * sub_pv
+                    contract_works_total += min(booked_val / sub_lt, 1.0) * sub_pv
                 else:
                     contract_works_total += booked_val
 
         approved_variations = Variation.objects.filter(
             project_id=project_id, 
             approval_status=Variation.ApprovalStatus.APPROVED,
+            commercial_department_approved=True,
             submitted_to_client=True
         )
         variations_total = sum(float(v.amount_claimed) if v.amount_claimed else float(v.total_amount) for v in approved_variations)
@@ -525,6 +534,7 @@ class MonthlyApplicationListCreateView(APIView):
 
         # Basic financial snapshot calculations
         from app.project_admin.models import UserInvoice, ProjectSubfolder, FolderAssignment
+        from django.db.models import Q
         import datetime
         
         assignments = FolderAssignment.objects.filter(
@@ -532,11 +542,18 @@ class MonthlyApplicationListCreateView(APIView):
         ).select_related('subfolder')
         assignment_map = {str(a.id): a.subfolder for a in assignments}
         
+        signed_off_filter = (
+            Q(supervisor_approved=True) |
+            Q(manager_approved=True) |
+            Q(contracts_manager_approved=True) |
+            Q(project_director_approved=True) |
+            Q(managing_director_approved=True)
+        )
         invoices = UserInvoice.objects.filter(
             project_id=project_id,
             source_type=UserInvoice.SourceType.LABOUR_TARGET,
             status=UserInvoice.Status.SUBMITTED
-        )
+        ).filter(signed_off_filter)
         contract_works_total = 0.0
         for inv in invoices:
             sid = inv.source_id or ""
@@ -555,7 +572,7 @@ class MonthlyApplicationListCreateView(APIView):
                         row_lt = float(row.get('labourTarget', 0) or 0)
                         booked_val = float(inv.total or 0)
                         if row_lt > 0:
-                            contract_works_total += (booked_val / row_lt) * row_pv
+                            contract_works_total += min(booked_val / row_lt, 1.0) * row_pv
                         else:
                             contract_works_total += booked_val
                 except (ValueError, TypeError):
@@ -565,13 +582,14 @@ class MonthlyApplicationListCreateView(APIView):
                 sub_lt = float(subfolder.labour_target or 0) if hasattr(subfolder, 'labour_target') else 0
                 booked_val = float(inv.total or 0)
                 if sub_lt > 0:
-                    contract_works_total += (booked_val / sub_lt) * sub_pv
+                    contract_works_total += min(booked_val / sub_lt, 1.0) * sub_pv
                 else:
                     contract_works_total += booked_val
         
         approved_variations = Variation.objects.filter(
             project_id=project_id, 
             approval_status=Variation.ApprovalStatus.APPROVED,
+            commercial_department_approved=True,
             submitted_to_client=True
         )
         variations_total = sum(float(v.amount_claimed) if v.amount_claimed else float(v.total_amount) for v in approved_variations)
@@ -615,11 +633,19 @@ class WhiteCardView(APIView):
         for a in assignments:
             subfolder_to_aids.setdefault(str(a['subfolder_id']), []).append(str(a['id']))
             
+        from django.db.models import Q
+        signed_off_filter = (
+            Q(supervisor_approved=True) |
+            Q(manager_approved=True) |
+            Q(contracts_manager_approved=True) |
+            Q(project_director_approved=True) |
+            Q(managing_director_approved=True)
+        )
         invoices = UserInvoice.objects.filter(
             project_id=project_id,
             source_type=UserInvoice.SourceType.LABOUR_TARGET,
             status=UserInvoice.Status.SUBMITTED
-        ).values('source_id', 'total')
+        ).filter(signed_off_filter).values('source_id', 'total')
         
         booked_by_source = {}
         for inv in invoices:
